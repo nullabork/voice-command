@@ -1,0 +1,25 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Tech Stack Overview
+
+This project uses a Python backend and a static frontend.
+
+**Backend:**
+- Python
+- HTTP Server (standard library or lightweight framework)
+- SQLite3 database
+- `speech_recognition` for voice
+- `pynput` (or similar) for keyboard control
+- WebSockets for real-time frontend updates
+
+**Frontend:**
+- Static HTML/CSS/JS served by the backend
+- Alpine.js
+- DaisyUI (via CDN)
+- No build tools
+
+See the full tech stack details here: [tech-stack.md](mdc:memory-bank/tech-stack.md)
+

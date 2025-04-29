@@ -1,0 +1,22 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Implementation Plan Summary
+
+The project will be built iteratively:
+1. Setup Python project structure.
+2. Implement backend database and models (SQLite).
+3. Set up backend HTTP server to serve static files.
+4. Create basic frontend shell (HTML, Alpine.js, DaisyUI).
+5. Build backend API endpoints (CRUD for commands, toggle state).
+6. Integrate frontend with API.
+7. Add backend speech recognition.
+8. Implement backend WebSocket for real-time updates.
+9. Integrate frontend WebSocket.
+10. Implement backend script parsing and execution.
+11. Refine and test thoroughly.
+
+For the detailed step-by-step plan, see: [plan.md](mdc:memory-bank/plan.md)
+
