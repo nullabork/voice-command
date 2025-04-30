@@ -28,16 +28,34 @@ def init_db():
         # Drop the existing table
         cursor.execute("DROP TABLE commands")
     
+    # Check if we need to migrate to add sentiment fields
+    sentiment_migration = False
+    try:
+        cursor.execute("SELECT sql FROM sqlite_master WHERE name='commands'")
+        table_def = cursor.fetchone()[0]
+        sentiment_migration = "understand_sentiment" not in table_def.lower()
+    except:
+        pass
+        
+    if sentiment_migration and not needs_migration:
+        print("Migrating database to support sentiment analysis...")
+        # Create a backup of the commands table
+        cursor.execute("CREATE TABLE IF NOT EXISTS commands_backup AS SELECT * FROM commands")
+        # Drop the existing table
+        cursor.execute("DROP TABLE commands")
+    
     # Create commands table with phrases as JSON array if not exists
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS commands (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         phrases TEXT NOT NULL,  -- JSON array of phrases
-        script TEXT NOT NULL
+        script TEXT NOT NULL,
+        understand_sentiment INTEGER DEFAULT 0,  -- Boolean 0/1 for sentiment analysis
+        sentiment_prefix TEXT DEFAULT ''  -- Prefix for sentiment-based commands
     )
     ''')
     
-    # Migrate data if needed
+    # Migrate data if needed for phrases
     if needs_migration:
         cursor.execute("SELECT id, phrase, script FROM commands_backup")
         for row in cursor.fetchall():
@@ -47,6 +65,31 @@ def init_db():
                 (row[0], phrases, row[2])
             )
         print("Migration completed.")
+    
+    # Migrate data if needed for sentiment fields
+    if sentiment_migration and not needs_migration:
+        # Check which columns exist in the backup table
+        cursor.execute("PRAGMA table_info(commands_backup)")
+        columns = [column[1] for column in cursor.fetchall()]
+        
+        if 'phrases' in columns:
+            # New schema backup
+            cursor.execute("SELECT id, phrases, script FROM commands_backup")
+            for row in cursor.fetchall():
+                cursor.execute(
+                    'INSERT INTO commands (id, phrases, script, understand_sentiment, sentiment_prefix) VALUES (?, ?, ?, ?, ?)',
+                    (row[0], row[1], row[2], 0, '')
+                )
+        elif 'phrase' in columns:
+            # Old schema backup
+            cursor.execute("SELECT id, phrase, script FROM commands_backup")
+            for row in cursor.fetchall():
+                phrases = json.dumps([row[1]])  # Convert single phrase to JSON array
+                cursor.execute(
+                    'INSERT INTO commands (id, phrases, script, understand_sentiment, sentiment_prefix) VALUES (?, ?, ?, ?, ?)',
+                    (row[0], phrases, row[2], 0, '')
+                )
+        print("Sentiment fields migration completed.")
     
     # Create settings table if not exists
     cursor.execute('''
@@ -59,6 +102,8 @@ def init_db():
     # Initialize default settings if they don't exist
     cursor.execute('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)', 
                   ('active', 'false'))
+    cursor.execute('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)', 
+                  ('openai_api_key', ''))
     
     conn.commit()
     conn.close()
@@ -69,7 +114,7 @@ def get_commands():
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
     
-    cursor.execute('SELECT id, phrases, script FROM commands')
+    cursor.execute('SELECT id, phrases, script, understand_sentiment, sentiment_prefix FROM commands')
     commands = []
     for row in cursor.fetchall():
         cmd = dict(row)
@@ -77,6 +122,8 @@ def get_commands():
         cmd['phrases'] = json.loads(cmd['phrases'])
         # Add primary phrase for compatibility
         cmd['phrase'] = cmd['phrases'][0] if cmd['phrases'] else ""
+        # Convert understand_sentiment to boolean
+        cmd['understand_sentiment'] = bool(cmd['understand_sentiment'])
         commands.append(cmd)
     
     conn.close()
@@ -100,12 +147,39 @@ def get_command_mappings():
     conn.close()
     return command_map
 
-def add_command(phrases, script):
+def get_sentiment_commands():
+    """Get commands that have sentiment analysis enabled."""
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    
+    cursor.execute('SELECT id, phrases, script, sentiment_prefix FROM commands WHERE understand_sentiment = 1')
+    sentiment_commands = {}
+    
+    for row in cursor.fetchall():
+        prefix = row['sentiment_prefix'].lower()
+        if prefix not in sentiment_commands:
+            sentiment_commands[prefix] = []
+            
+        # Add command to the list for this prefix
+        cmd = {
+            'id': row['id'],
+            'phrases': json.loads(row['phrases']),
+            'script': row['script']
+        }
+        sentiment_commands[prefix].append(cmd)
+    
+    conn.close()
+    return sentiment_commands
+
+def add_command(phrases, script, understand_sentiment=False, sentiment_prefix=''):
     """Add a new command to the database.
     
     Args:
         phrases: Single string or list of phrases
         script: Command script to execute
+        understand_sentiment: Whether to use sentiment analysis
+        sentiment_prefix: Prefix for sentiment-based commands
     """
     # Ensure phrases is a list
     if isinstance(phrases, str):
@@ -115,8 +189,8 @@ def add_command(phrases, script):
     cursor = conn.cursor()
     
     cursor.execute(
-        'INSERT INTO commands (phrases, script) VALUES (?, ?)',
-        (json.dumps(phrases), script)
+        'INSERT INTO commands (phrases, script, understand_sentiment, sentiment_prefix) VALUES (?, ?, ?, ?)',
+        (json.dumps(phrases), script, 1 if understand_sentiment else 0, sentiment_prefix)
     )
     
     command_id = cursor.lastrowid
@@ -125,13 +199,15 @@ def add_command(phrases, script):
     
     return command_id
 
-def update_command(command_id, phrases, script):
+def update_command(command_id, phrases, script, understand_sentiment=False, sentiment_prefix=''):
     """Update an existing command in the database.
     
     Args:
         command_id: ID of command to update
         phrases: Single string or list of phrases
         script: Command script to execute
+        understand_sentiment: Whether to use sentiment analysis
+        sentiment_prefix: Prefix for sentiment-based commands
     """
     # Ensure phrases is a list
     if isinstance(phrases, str):
@@ -141,8 +217,8 @@ def update_command(command_id, phrases, script):
     cursor = conn.cursor()
     
     cursor.execute(
-        'UPDATE commands SET phrases = ?, script = ? WHERE id = ?',
-        (json.dumps(phrases), script, command_id)
+        'UPDATE commands SET phrases = ?, script = ?, understand_sentiment = ?, sentiment_prefix = ? WHERE id = ?',
+        (json.dumps(phrases), script, 1 if understand_sentiment else 0, sentiment_prefix, command_id)
     )
     
     rows_affected = cursor.rowcount
@@ -186,4 +262,30 @@ def set_active_state(active):
     )
     
     conn.commit()
-    conn.close() 
+    conn.close()
+
+def get_openai_api_key():
+    """Get the OpenAI API key from the database."""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    
+    cursor.execute('SELECT value FROM settings WHERE key = ?', ('openai_api_key',))
+    result = cursor.fetchone()
+    api_key = result[0] if result else ''
+    
+    conn.close()
+    return api_key
+
+def set_openai_api_key(api_key):
+    """Set the OpenAI API key in the database."""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    
+    cursor.execute(
+        'INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)',
+        ('openai_api_key', api_key)
+    )
+    
+    conn.commit()
+    conn.close()
+    return True 

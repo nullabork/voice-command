@@ -35,17 +35,65 @@
             </div>
         </div>
         
+        <!-- Settings Modal -->
+        <div x-show="showSettings" class="modal modal-open">
+            <div class="modal-box">
+                <h3 class="font-bold text-lg">Settings</h3>
+                
+                <div class="form-control w-full mt-4">
+                    <label class="label">
+                        <span class="label-text">OpenAI API Key</span>
+                        <span class="label-text-alt">Required for sentiment analysis</span>
+                    </label>
+                    <div class="flex gap-2">
+                        <input 
+                            type="password" 
+                            x-model="openaiApiKey" 
+                            placeholder="Enter your OpenAI API key" 
+                            class="input input-bordered w-full" 
+                        />
+                        <button @click="saveApiKey()" class="btn btn-primary">Save</button>
+                    </div>
+                    <label class="label">
+                        <span class="label-text-alt" x-show="apiKeyStatus.isSet">
+                            <span class="text-success">✓ API key is set</span>
+                            <span x-text="'(' + apiKeyStatus.apiKey + ')'"></span>
+                        </span>
+                        <span class="label-text-alt text-error" x-show="!apiKeyStatus.isSet">
+                            ✗ No API key set - sentiment analysis will not work
+                        </span>
+                    </label>
+                    <div class="text-xs mt-2">
+                        <p>You can get an OpenAI API key from <a href="https://platform.openai.com/api-keys" target="_blank" class="link">platform.openai.com/api-keys</a></p>
+                        <p>The API key is stored securely in the database and used only for the sentiment analysis feature.</p>
+                    </div>
+                </div>
+                
+                <div class="modal-action">
+                    <button class="btn" @click="showSettings = false">Close</button>
+                </div>
+            </div>
+        </div>
+        
         <!-- Main Content -->
         <main class="flex flex-col md:flex-row gap-8">
             <!-- Left Column - Commands List -->
             <div class="flex-1 bg-base-100 rounded-box p-4 shadow-md">
                 <div class="flex justify-between items-center mb-4">
                     <h2 class="text-xl font-semibold">Voice Commands</h2>
-                    <label class="swap swap-flip">
-                        <input type="checkbox" x-model="isActive" @change="toggleActiveState" />
-                        <div class="swap-on badge badge-success gap-1">Listening</div>
-                        <div class="swap-off badge badge-error gap-1">Not Active</div>
-                    </label>
+                    <div class="flex gap-2">
+                        <button @click="showSettings = true" class="btn btn-sm btn-ghost" title="Settings">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 010 .255c-.007.378.138.75.43.99l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-.255c.007-.378-.138-.75-.43-.99l-1.004-.828a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.281z" />
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            </svg>
+                        </button>
+                        <label class="swap swap-flip">
+                            <input type="checkbox" x-model="isActive" @change="toggleActiveState" />
+                            <div class="swap-on badge badge-success gap-1">Listening</div>
+                            <div class="swap-off badge badge-error gap-1">Not Active</div>
+                        </label>
+                    </div>
                 </div>
                 
                 <!-- Command List -->
@@ -55,6 +103,7 @@
                             <tr>
                                 <th>Voice Phrases</th>
                                 <th>Action</th>
+                                <th>Sentiment</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
@@ -73,6 +122,16 @@
                                             <button @click="previewScript(command.script)" class="btn btn-sm btn-ghost">Preview</button>
                                         </div>
                                     </td>
+                                    <td>
+                                        <span x-show="command.understand_sentiment" class="badge badge-accent">
+                                            <template x-if="command.sentiment_prefix">
+                                                <span x-text="command.sentiment_prefix"></span>
+                                            </template>
+                                            <template x-if="!command.sentiment_prefix">
+                                                <span>Enabled</span>
+                                            </template>
+                                        </span>
+                                    </td>
                                     <td class="flex gap-2">
                                         <button @click="startEditing(command)" class="btn btn-sm btn-info">Edit</button>
                                         <button @click="deleteCommand(command.id)" class="btn btn-sm btn-error">Delete</button>
@@ -80,7 +139,7 @@
                                 </tr>
                             </template>
                             <tr x-show="commands.length === 0">
-                                <td colspan="3" class="text-center py-4">No commands configured yet.</td>
+                                <td colspan="4" class="text-center py-4">No commands configured yet.</td>
                             </tr>
                         </tbody>
                     </table>
@@ -140,6 +199,33 @@
                                 </span>
                             </label>
                             <textarea x-model="newCommand.script" placeholder="Enter keyboard commands..." class="textarea textarea-bordered h-24" required></textarea>
+                        </div>
+                        
+                        <!-- Sentiment Analysis Options -->
+                        <div class="form-control">
+                            <label class="label cursor-pointer justify-start gap-2">
+                                <input type="checkbox" class="checkbox checkbox-accent" x-model="newCommand.understand_sentiment" />
+                                <span class="label-text">Understand Sentiment</span>
+                                <span class="label-text-alt opacity-70">(Uses ChatGPT to match intent)</span>
+                            </label>
+                            
+                            <!-- Sentiment Prefix (only shown when checkbox is checked) -->
+                            <div x-show="newCommand.understand_sentiment" class="mt-2">
+                                <label class="label">
+                                    <span class="label-text">Prefix</span>
+                                    <span class="label-text-alt">Voice commands will only match if they start with this prefix</span>
+                                </label>
+                                <input type="text" x-model="newCommand.sentiment_prefix" placeholder="e.g., 'alpha tango'" class="input input-bordered w-full" />
+                                <div class="text-xs mt-1 opacity-70">
+                                    When a phrase begins with this prefix, ChatGPT will determine if your command should execute
+                                </div>
+                                <div x-show="!apiKeyStatus.isSet" class="alert alert-warning mt-2 text-xs">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-4 w-4" fill="none" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                    </svg>
+                                    <span>OpenAI API key not set. Click the settings icon to set up your API key.</span>
+                                </div>
+                            </div>
                         </div>
                         
                         <div class="flex gap-2">

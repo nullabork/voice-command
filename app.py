@@ -7,6 +7,7 @@ A web application that listens to voice commands and executes keyboard actions.
 from flask import Flask, request
 from flask_cors import CORS
 from flask_socketio import SocketIO
+import os
 
 # Import app modules
 import db
@@ -54,6 +55,15 @@ def initialize_app():
     """Initialize the application components."""
     # Initialize the database
     db.init_db()
+    
+    # Load OpenAI API key from the database
+    openai_api_key = db.get_openai_api_key()
+    if openai_api_key:
+        os.environ['OPENAI_API_KEY'] = openai_api_key
+        print(f"OpenAI API key loaded from database: {'*' * (len(openai_api_key) - 4) + openai_api_key[-4:] if len(openai_api_key) > 4 else openai_api_key}")
+    else:
+        print("WARNING: OpenAI API key not set. Sentiment analysis feature will not work.")
+        print("You can set the OpenAI API key in the settings.")
     
     # Check if active state is true, and start speech recognition if needed
     if db.get_active_state():

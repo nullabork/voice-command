@@ -16,7 +16,9 @@ document.addEventListener('alpine:init', () => {
         newCommand: {
             phrases: [],
             currentPhrase: '',  // For the input field
-            script: ''
+            script: '',
+            understand_sentiment: false,
+            sentiment_prefix: ''
         },
         editingCommand: null,
         previewResult: {
@@ -25,6 +27,13 @@ document.addEventListener('alpine:init', () => {
             message: ''
         },
         socket: null,
+        // Settings
+        showSettings: false,
+        openaiApiKey: '',
+        apiKeyStatus: {
+            isSet: false,
+            apiKey: ''
+        },
 
         /**
          * Initializes the application
@@ -36,6 +45,9 @@ document.addEventListener('alpine:init', () => {
             
             // Get active state
             this.fetchActiveState();
+            
+            // Get API key status
+            this.fetchApiKeyStatus();
             
             // Connect to WebSocket
             this.connectWebSocket();
@@ -56,6 +68,80 @@ document.addEventListener('alpine:init', () => {
                 }
             } catch (error) {
                 console.error('Error fetching commands:', error);
+            }
+        },
+
+        /**
+         * Fetches the OpenAI API key status
+         */
+        async fetchApiKeyStatus() {
+            try {
+                console.log('Fetching API key status...');
+                const response = await fetch('api/openai-key');
+                if (response.ok) {
+                    const data = await response.json();
+                    this.apiKeyStatus = {
+                        isSet: data.is_set,
+                        apiKey: data.api_key
+                    };
+                    console.log('API key status:', this.apiKeyStatus.isSet ? 'Set' : 'Not set');
+                } else {
+                    console.error('Failed to fetch API key status');
+                }
+            } catch (error) {
+                console.error('Error fetching API key status:', error);
+            }
+        },
+
+        /**
+         * Saves the OpenAI API key
+         */
+        async saveApiKey() {
+            if (!this.openaiApiKey.trim()) {
+                alert('Please enter a valid API key');
+                return;
+            }
+
+            try {
+                console.log('Saving API key...');
+                const response = await fetch('api/openai-key', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        api_key: this.openaiApiKey
+                    })
+                });
+
+                if (response.ok) {
+                    // Clear the input field
+                    this.openaiApiKey = '';
+                    
+                    // Refresh the API key status
+                    await this.fetchApiKeyStatus();
+                    
+                    // Show success message
+                    this.previewResult = {
+                        show: true,
+                        success: true,
+                        message: 'API key saved successfully'
+                    };
+                } else {
+                    console.error('Failed to save API key');
+                    this.previewResult = {
+                        show: true,
+                        success: false,
+                        message: 'Failed to save API key'
+                    };
+                }
+            } catch (error) {
+                console.error('Error saving API key:', error);
+                this.previewResult = {
+                    show: true,
+                    success: false,
+                    message: 'Error saving API key: ' + error.message
+                };
             }
         },
 
@@ -95,6 +181,20 @@ document.addEventListener('alpine:init', () => {
                 return;
             }
             
+            // Validate sentiment prefix if sentiment is enabled
+            if (this.newCommand.understand_sentiment && !this.newCommand.sentiment_prefix.trim()) {
+                alert("Please provide a prefix for sentiment-based matching");
+                return;
+            }
+            
+            // Validate API key if sentiment analysis is enabled
+            if (this.newCommand.understand_sentiment && !this.apiKeyStatus.isSet) {
+                if (confirm("Sentiment analysis requires an OpenAI API key. Would you like to set it up now?")) {
+                    this.showSettings = true;
+                    return;
+                }
+            }
+            
             try {
                 console.log('Adding command:', this.newCommand);
                 const response = await fetch('api/commands', {
@@ -104,7 +204,9 @@ document.addEventListener('alpine:init', () => {
                     },
                     body: JSON.stringify({
                         phrases: this.newCommand.phrases,
-                        script: this.newCommand.script
+                        script: this.newCommand.script,
+                        understand_sentiment: this.newCommand.understand_sentiment,
+                        sentiment_prefix: this.newCommand.sentiment_prefix
                     })
                 });
 
@@ -117,6 +219,8 @@ document.addEventListener('alpine:init', () => {
                     this.newCommand.phrases = [];
                     this.newCommand.currentPhrase = '';
                     this.newCommand.script = '';
+                    this.newCommand.understand_sentiment = false;
+                    this.newCommand.sentiment_prefix = '';
                 } else {
                     console.error('Failed to add command');
                 }
@@ -139,6 +243,8 @@ document.addEventListener('alpine:init', () => {
             this.newCommand.phrases = [...command.phrases];
             this.newCommand.currentPhrase = '';
             this.newCommand.script = command.script;
+            this.newCommand.understand_sentiment = command.understand_sentiment || false;
+            this.newCommand.sentiment_prefix = command.sentiment_prefix || '';
         },
         
         /**
@@ -150,6 +256,8 @@ document.addEventListener('alpine:init', () => {
             this.newCommand.phrases = [];
             this.newCommand.currentPhrase = '';
             this.newCommand.script = '';
+            this.newCommand.understand_sentiment = false;
+            this.newCommand.sentiment_prefix = '';
         },
         
         /**
@@ -168,6 +276,20 @@ document.addEventListener('alpine:init', () => {
                 return;
             }
             
+            // Validate sentiment prefix if sentiment is enabled
+            if (this.newCommand.understand_sentiment && !this.newCommand.sentiment_prefix.trim()) {
+                alert("Please provide a prefix for sentiment-based matching");
+                return;
+            }
+            
+            // Validate API key if sentiment analysis is enabled
+            if (this.newCommand.understand_sentiment && !this.apiKeyStatus.isSet) {
+                if (confirm("Sentiment analysis requires an OpenAI API key. Would you like to set it up now?")) {
+                    this.showSettings = true;
+                    return;
+                }
+            }
+            
             try {
                 console.log('Saving edited command:', this.newCommand);
                 const response = await fetch(`api/commands/${this.editingCommand.id}`, {
@@ -177,7 +299,9 @@ document.addEventListener('alpine:init', () => {
                     },
                     body: JSON.stringify({
                         phrases: this.newCommand.phrases,
-                        script: this.newCommand.script
+                        script: this.newCommand.script,
+                        understand_sentiment: this.newCommand.understand_sentiment,
+                        sentiment_prefix: this.newCommand.sentiment_prefix
                     })
                 });
 
@@ -189,7 +313,9 @@ document.addEventListener('alpine:init', () => {
                             id: this.editingCommand.id,
                             phrases: [...this.newCommand.phrases],
                             phrase: this.newCommand.phrases[0], // For backward compatibility
-                            script: this.newCommand.script
+                            script: this.newCommand.script,
+                            understand_sentiment: this.newCommand.understand_sentiment,
+                            sentiment_prefix: this.newCommand.sentiment_prefix
                         };
                     }
                     
@@ -200,6 +326,8 @@ document.addEventListener('alpine:init', () => {
                     this.newCommand.phrases = [];
                     this.newCommand.currentPhrase = '';
                     this.newCommand.script = '';
+                    this.newCommand.understand_sentiment = false;
+                    this.newCommand.sentiment_prefix = '';
                 } else {
                     console.error('Failed to update command');
                 }
@@ -232,6 +360,8 @@ document.addEventListener('alpine:init', () => {
                         this.newCommand.phrases = [];
                         this.newCommand.currentPhrase = '';
                         this.newCommand.script = '';
+                        this.newCommand.understand_sentiment = false;
+                        this.newCommand.sentiment_prefix = '';
                     }
                 } else {
                     console.error('Failed to delete command');
