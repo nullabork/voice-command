@@ -1,7 +1,7 @@
 ---
 description: 
 globs: 
-alwaysApply: false
+alwaysApply: true
 ---
 # Application Requirements Summary
 
@@ -16,6 +16,7 @@ Key features include:
 - State persistence across restarts
 
 For full details, see the requirements document: [requirements.md](mdc:memory-bank/requirements.md)
+
 
 
 

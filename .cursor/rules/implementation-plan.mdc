@@ -1,7 +1,7 @@
 ---
 description: 
 globs: 
-alwaysApply: false
+alwaysApply: true
 ---
 # Implementation Plan Summary
 
@@ -24,6 +24,7 @@ For the detailed implementation plan with checkmarks, see: [plan.md](mdc:memory-
 ## Tracking Progress
 
 When updating the implementation plan with new progress or issues, follow the guidelines in the [Progress Tracking Guidelines](mdc:.cursor/rules/progress-tracking.mdc) rule.
+
 
 
 

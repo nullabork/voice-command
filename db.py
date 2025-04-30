@@ -2,6 +2,7 @@
 Database module for voice command application.
 """
 import sqlite3
+import json
 
 # Database setup
 DB_PATH = 'voicecommand.db'
@@ -11,14 +12,41 @@ def init_db():
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     
-    # Create commands table if not exists
+    # Check if we need to migrate data
+    needs_migration = False
+    try:
+        cursor.execute("SELECT sql FROM sqlite_master WHERE name='commands'")
+        table_def = cursor.fetchone()[0]
+        needs_migration = "JSON" not in table_def and "json" not in table_def
+    except:
+        pass
+        
+    if needs_migration:
+        print("Migrating database to support multiple phrases...")
+        # Create a backup of the commands table
+        cursor.execute("CREATE TABLE IF NOT EXISTS commands_backup AS SELECT * FROM commands")
+        # Drop the existing table
+        cursor.execute("DROP TABLE commands")
+    
+    # Create commands table with phrases as JSON array if not exists
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS commands (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        phrase TEXT NOT NULL,
+        phrases TEXT NOT NULL,  -- JSON array of phrases
         script TEXT NOT NULL
     )
     ''')
+    
+    # Migrate data if needed
+    if needs_migration:
+        cursor.execute("SELECT id, phrase, script FROM commands_backup")
+        for row in cursor.fetchall():
+            phrases = json.dumps([row[1]])  # Convert single phrase to JSON array
+            cursor.execute(
+                'INSERT INTO commands (id, phrases, script) VALUES (?, ?, ?)',
+                (row[0], phrases, row[2])
+            )
+        print("Migration completed.")
     
     # Create settings table if not exists
     cursor.execute('''
@@ -41,8 +69,15 @@ def get_commands():
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
     
-    cursor.execute('SELECT * FROM commands')
-    commands = [dict(row) for row in cursor.fetchall()]
+    cursor.execute('SELECT id, phrases, script FROM commands')
+    commands = []
+    for row in cursor.fetchall():
+        cmd = dict(row)
+        # Parse phrases JSON array back to Python list
+        cmd['phrases'] = json.loads(cmd['phrases'])
+        # Add primary phrase for compatibility
+        cmd['phrase'] = cmd['phrases'][0] if cmd['phrases'] else ""
+        commands.append(cmd)
     
     conn.close()
     return commands
@@ -53,20 +88,35 @@ def get_command_mappings():
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
     
-    cursor.execute('SELECT phrase, script FROM commands')
-    commands = {row['phrase'].lower(): row['script'] for row in cursor.fetchall()}
+    cursor.execute('SELECT phrases, script FROM commands')
+    command_map = {}
+    
+    for row in cursor.fetchall():
+        script = row['script']
+        # Each phrase in the JSON array maps to the same script
+        for phrase in json.loads(row['phrases']):
+            command_map[phrase.lower()] = script
     
     conn.close()
-    return commands
+    return command_map
 
-def add_command(phrase, script):
-    """Add a new command to the database."""
+def add_command(phrases, script):
+    """Add a new command to the database.
+    
+    Args:
+        phrases: Single string or list of phrases
+        script: Command script to execute
+    """
+    # Ensure phrases is a list
+    if isinstance(phrases, str):
+        phrases = [phrases]
+    
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     
     cursor.execute(
-        'INSERT INTO commands (phrase, script) VALUES (?, ?)',
-        (phrase, script)
+        'INSERT INTO commands (phrases, script) VALUES (?, ?)',
+        (json.dumps(phrases), script)
     )
     
     command_id = cursor.lastrowid
@@ -75,14 +125,24 @@ def add_command(phrase, script):
     
     return command_id
 
-def update_command(command_id, phrase, script):
-    """Update an existing command in the database."""
+def update_command(command_id, phrases, script):
+    """Update an existing command in the database.
+    
+    Args:
+        command_id: ID of command to update
+        phrases: Single string or list of phrases
+        script: Command script to execute
+    """
+    # Ensure phrases is a list
+    if isinstance(phrases, str):
+        phrases = [phrases]
+        
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     
     cursor.execute(
-        'UPDATE commands SET phrase = ?, script = ? WHERE id = ?',
-        (phrase, script, command_id)
+        'UPDATE commands SET phrases = ?, script = ? WHERE id = ?',
+        (json.dumps(phrases), script, command_id)
     )
     
     rows_affected = cursor.rowcount

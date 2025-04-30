@@ -53,7 +53,7 @@
                     <table class="table table-zebra w-full">
                         <thead>
                             <tr>
-                                <th>Voice Phrase</th>
+                                <th>Voice Phrases</th>
                                 <th>Action</th>
                                 <th>Actions</th>
                             </tr>
@@ -61,7 +61,13 @@
                         <tbody>
                             <template x-for="command in commands" :key="command.id">
                                 <tr>
-                                    <td x-text="command.phrase"></td>
+                                    <td>
+                                        <div class="flex flex-wrap gap-1">
+                                            <template x-for="phrase in command.phrases" :key="phrase">
+                                                <span class="badge badge-primary" x-text="phrase"></span>
+                                            </template>
+                                        </div>
+                                    </td>
                                     <td>
                                         <div class="tooltip" :data-tip="command.script">
                                             <button @click="previewScript(command.script)" class="btn btn-sm btn-ghost">Preview</button>
@@ -90,11 +96,25 @@
                     <form @submit.prevent="editingCommand ? saveEdit() : addCommand()" class="flex flex-col gap-4">
                         <div class="form-control">
                             <label class="label">
-                                <span class="label-text">Voice Phrase</span>
+                                <span class="label-text">Voice Phrases</span>
+                                <span class="label-text-alt">Add multiple ways to trigger the same command</span>
                             </label>
+                            
+                            <!-- Current phrase list -->
+                            <div class="flex flex-wrap gap-2 mb-2" x-show="newCommand.phrases.length > 0">
+                                <template x-for="phrase in newCommand.phrases" :key="phrase">
+                                    <div class="badge badge-primary gap-1">
+                                        <span x-text="phrase"></span>
+                                        <button type="button" @click="removePhrase(phrase)" class="btn btn-xs btn-circle btn-ghost">×</button>
+                                    </div>
+                                </template>
+                            </div>
+                            
+                            <!-- New phrase input -->
                             <div class="input-group">
-                                <input type="text" x-model="newCommand.phrase" placeholder="What you'll say..." class="input input-bordered w-full" required />
-                                <button type="button" @click="useRecentSpeech" class="btn btn-square" title="Use recent speech">📋</button>
+                                <input type="text" x-model="newCommand.currentPhrase" placeholder="What you'll say..." class="input input-bordered w-full" />
+                                <button type="button" @click="addPhrase()" class="btn">Add</button>
+                                <button type="button" @click="useRecentSpeech()" class="btn btn-square" title="Use recent speech">📋</button>
                             </div>
                         </div>
                         

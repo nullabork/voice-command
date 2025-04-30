@@ -27,14 +27,23 @@ def get_commands():
 def add_command():
     data = request.get_json()
     
-    if not data or 'phrase' not in data or 'script' not in data:
+    if not data or 'script' not in data:
         return jsonify({'error': 'Missing required fields'}), 400
     
-    command_id = db.add_command(data['phrase'], data['script'])
+    # Handle both single phrase and multiple phrases
+    phrases = data.get('phrases', [])
+    if not phrases and 'phrase' in data:
+        phrases = [data['phrase']]
+    
+    if not phrases:
+        return jsonify({'error': 'At least one phrase is required'}), 400
+    
+    command_id = db.add_command(phrases, data['script'])
     
     return jsonify({
         'id': command_id, 
-        'phrase': data['phrase'], 
+        'phrases': phrases,
+        'phrase': phrases[0],  # For backward compatibility
         'script': data['script']
     }), 201
 
@@ -42,17 +51,26 @@ def add_command():
 def update_command(command_id):
     data = request.get_json()
     
-    if not data or 'phrase' not in data or 'script' not in data:
+    if not data or 'script' not in data:
         return jsonify({'error': 'Missing required fields'}), 400
     
-    success = db.update_command(command_id, data['phrase'], data['script'])
+    # Handle both single phrase and multiple phrases
+    phrases = data.get('phrases', [])
+    if not phrases and 'phrase' in data:
+        phrases = [data['phrase']]
+    
+    if not phrases:
+        return jsonify({'error': 'At least one phrase is required'}), 400
+    
+    success = db.update_command(command_id, phrases, data['script'])
     
     if not success:
         return jsonify({'error': 'Command not found'}), 404
     
     return jsonify({
         'id': command_id, 
-        'phrase': data['phrase'], 
+        'phrases': phrases,
+        'phrase': phrases[0],  # For backward compatibility
         'script': data['script']
     })
 

@@ -56,6 +56,13 @@
     - ✅ Implemented automatic recovery for crashed threads
     - ✅ Added state persistence across server restarts
 
+11. **Multiple Phrases Support:**
+    - ✅ Updated database schema to support multiple phrases per command
+    - ✅ Added migration logic to preserve existing data
+    - ✅ Updated API endpoints to handle multiple phrases
+    - ✅ Enhanced frontend UI to add/remove alternative phrases
+    - ✅ Updated phrase matching to check against all alternatives
+
 ## Remaining Tasks
 
 1. **User Experience Improvements:**

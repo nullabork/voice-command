@@ -14,7 +14,8 @@ document.addEventListener('alpine:init', () => {
         isActive: false,
         recentSpeech: '',
         newCommand: {
-            phrase: '',
+            phrases: [],
+            currentPhrase: '',  // For the input field
             script: ''
         },
         editingCommand: null,
@@ -59,9 +60,41 @@ document.addEventListener('alpine:init', () => {
         },
 
         /**
+         * Adds a phrase to the current command being edited
+         */
+        addPhrase() {
+            if (!this.newCommand.currentPhrase) return;
+            
+            // Don't add duplicate phrases
+            if (!this.newCommand.phrases.includes(this.newCommand.currentPhrase)) {
+                this.newCommand.phrases.push(this.newCommand.currentPhrase);
+            }
+            
+            // Clear the input field
+            this.newCommand.currentPhrase = '';
+        },
+        
+        /**
+         * Removes a phrase from the current command being edited
+         */
+        removePhrase(phrase) {
+            this.newCommand.phrases = this.newCommand.phrases.filter(p => p !== phrase);
+        },
+
+        /**
          * Adds a new command
          */
         async addCommand() {
+            // Make sure we have at least one phrase
+            if (this.newCommand.currentPhrase && !this.newCommand.phrases.includes(this.newCommand.currentPhrase)) {
+                this.newCommand.phrases.push(this.newCommand.currentPhrase);
+            }
+            
+            if (this.newCommand.phrases.length === 0) {
+                alert("Please add at least one voice phrase");
+                return;
+            }
+            
             try {
                 console.log('Adding command:', this.newCommand);
                 const response = await fetch('api/commands', {
@@ -69,7 +102,10 @@ document.addEventListener('alpine:init', () => {
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify(this.newCommand)
+                    body: JSON.stringify({
+                        phrases: this.newCommand.phrases,
+                        script: this.newCommand.script
+                    })
                 });
 
                 if (response.ok) {
@@ -78,7 +114,8 @@ document.addEventListener('alpine:init', () => {
                     console.log('Command added successfully');
                     
                     // Reset form
-                    this.newCommand.phrase = '';
+                    this.newCommand.phrases = [];
+                    this.newCommand.currentPhrase = '';
                     this.newCommand.script = '';
                 } else {
                     console.error('Failed to add command');
@@ -95,12 +132,12 @@ document.addEventListener('alpine:init', () => {
             console.log('Starting to edit command:', command);
             this.editingCommand = {
                 id: command.id,
-                phrase: command.phrase,
-                script: command.script
+                phrases: [...command.phrases]
             };
             
             // Update the form with the command data
-            this.newCommand.phrase = command.phrase;
+            this.newCommand.phrases = [...command.phrases];
+            this.newCommand.currentPhrase = '';
             this.newCommand.script = command.script;
         },
         
@@ -110,7 +147,8 @@ document.addEventListener('alpine:init', () => {
         cancelEditing() {
             console.log('Canceling edit');
             this.editingCommand = null;
-            this.newCommand.phrase = '';
+            this.newCommand.phrases = [];
+            this.newCommand.currentPhrase = '';
             this.newCommand.script = '';
         },
         
@@ -120,6 +158,16 @@ document.addEventListener('alpine:init', () => {
         async saveEdit() {
             if (!this.editingCommand) return;
             
+            // Make sure we have at least one phrase
+            if (this.newCommand.currentPhrase && !this.newCommand.phrases.includes(this.newCommand.currentPhrase)) {
+                this.newCommand.phrases.push(this.newCommand.currentPhrase);
+            }
+            
+            if (this.newCommand.phrases.length === 0) {
+                alert("Please add at least one voice phrase");
+                return;
+            }
+            
             try {
                 console.log('Saving edited command:', this.newCommand);
                 const response = await fetch(`api/commands/${this.editingCommand.id}`, {
@@ -127,7 +175,10 @@ document.addEventListener('alpine:init', () => {
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify(this.newCommand)
+                    body: JSON.stringify({
+                        phrases: this.newCommand.phrases,
+                        script: this.newCommand.script
+                    })
                 });
 
                 if (response.ok) {
@@ -136,7 +187,8 @@ document.addEventListener('alpine:init', () => {
                     if (index !== -1) {
                         this.commands[index] = {
                             id: this.editingCommand.id,
-                            phrase: this.newCommand.phrase,
+                            phrases: [...this.newCommand.phrases],
+                            phrase: this.newCommand.phrases[0], // For backward compatibility
                             script: this.newCommand.script
                         };
                     }
@@ -145,7 +197,8 @@ document.addEventListener('alpine:init', () => {
                     
                     // Reset form
                     this.editingCommand = null;
-                    this.newCommand.phrase = '';
+                    this.newCommand.phrases = [];
+                    this.newCommand.currentPhrase = '';
                     this.newCommand.script = '';
                 } else {
                     console.error('Failed to update command');
@@ -176,7 +229,8 @@ document.addEventListener('alpine:init', () => {
                     // If we were editing this command, clear the form
                     if (this.editingCommand && this.editingCommand.id === id) {
                         this.editingCommand = null;
-                        this.newCommand.phrase = '';
+                        this.newCommand.phrases = [];
+                        this.newCommand.currentPhrase = '';
                         this.newCommand.script = '';
                     }
                 } else {
@@ -303,7 +357,7 @@ document.addEventListener('alpine:init', () => {
         useRecentSpeech() {
             if (this.recentSpeech) {
                 console.log('Using recent speech:', this.recentSpeech);
-                this.newCommand.phrase = this.recentSpeech;
+                this.newCommand.currentPhrase = this.recentSpeech;
             }
         }
     }));

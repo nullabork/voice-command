@@ -4,7 +4,8 @@
 - Listen to the default OS microphone device for user speech.
 - Perform speech-to-text processing on audio chunks, detecting text between periods of silence.
 - Match recognized phrases against a user-defined list of phrases.
-- Each phrase is mapped to a script containing a sequence of keyboard actions (keystrokes, combinations, delays).
+- Support multiple alternative phrases for each command to handle recognition variations.
+- Each command (with its alternative phrases) is mapped to a script containing a sequence of keyboard actions.
 - Execute the corresponding keyboard script when a phrase is matched.
 - Inject the keyboard actions into the active operating system window.
 - Automatically restart speech recognition if it fails unexpectedly.
@@ -13,9 +14,9 @@
 ## Configuration & Management (via Web Interface)
 - **View Mappings:** Display a list of all currently defined voice phrase-to-keyboard script mappings.
 - **Add Mappings:** Allow users to define new mappings:
-    - Input a voice phrase (or potentially use a recently spoken chunk).
+    - Input one or more voice phrases for the same command.
     - Input a keyboard script according to the specified format.
-- **Edit Mappings:** Allow users to edit existing phrase-to-script mappings.
+- **Edit Mappings:** Allow users to edit existing phrase-to-script mappings, including adding/removing alternative phrases.
 - **Remove Mappings:** Allow users to delete existing mappings.
 - **Test Scripts:** Allow testing of keyboard scripts from the UI before saving.
 - **Real-time Speech Display:** Show the recognized text chunks from the microphone in real-time on the web interface (facilitates adding new phrases).

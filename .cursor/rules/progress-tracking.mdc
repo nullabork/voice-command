@@ -1,5 +1,40 @@
 ---
-description:
-globs:
-alwaysApply: false
+description: 
+globs: 
+alwaysApply: true
 ---
+# Progress Tracking Guidelines
+
+When working on this project, follow these guidelines for tracking progress:
+
+## Updating the Implementation Plan
+
+- As you complete tasks in the [implementation plan](mdc:memory-bank/plan.md), add checkmarks (✅) next to completed items.
+- If a task turns out to be unnecessary, mark it with (❌) and add a note about why it was skipped.
+- For tasks in progress, consider marking them with (🔄).
+
+## Reporting Issues
+
+- If you encounter problems with a specific component, document them in the plan file under the relevant section.
+- Create a "Known Issues" section at the end of the plan when necessary.
+- Format issues with: ⚠️ [Component] - Brief description of the issue
+
+## Adding New Requirements
+
+- When new requirements are identified, add them to the [requirements document](mdc:memory-bank/requirements.md).
+- Then reflect these new requirements in the plan by adding new tasks.
+- Mark new tasks with (➕) to indicate they were added after the initial plan.
+
+## Example Update Format
+
+```markdown
+7. **Backend - Speech Recognition:**
+   - ✅ Integrated the `speech_recognition` library
+   - ✅ Implemented microphone listening loop
+   - 🔄 Adding error handling for network failures
+   - ❌ Custom speech model integration (unnecessary, using Google API instead)
+   
+Known Issues:
+- ⚠️ Speech Recognition - Occasional delays when network connection is slow
+```
+
