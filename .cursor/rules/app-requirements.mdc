@@ -7,10 +7,15 @@ alwaysApply: false
 
 This application listens to voice commands via the microphone, matches them to predefined phrases, and executes corresponding keyboard scripts to control applications like games.
 
-Key requirements include:
-- Voice recognition and phrase matching.
-- Keyboard script execution (keystrokes, combinations, delays).
-- A web interface for managing phrase-script mappings and toggling activity.
+Key features include:
+- Voice recognition and phrase matching
+- Keyboard script execution (keystrokes, combinations, delays)
+- Web interface for managing command mappings
+- Real-time speech display and command testing
+- Automatic recovery from failures
+- State persistence across restarts
 
 For full details, see the requirements document: [requirements.md](mdc:memory-bank/requirements.md)
+
+
 

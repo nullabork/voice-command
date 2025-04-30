@@ -1,0 +1,20 @@
+# Web server and API
+flask>=2.3.0
+flask-cors>=4.0.0
+
+# WebSocket support
+flask-socketio>=5.3.0
+
+
+# Speech recognition
+SpeechRecognition>=3.10.0
+pyaudio>=0.2.13
+
+# Keyboard input simulation - choose ONE of the following:
+# Default choice:
+pynput>=1.7.6
+# Alternative (comment out one set):
+# pyautogui>=0.9.54
+
+# Utilities
+python-dotenv>=1.0.0
