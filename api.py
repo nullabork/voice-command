@@ -163,4 +163,14 @@ def manage_openai_api_key():
         # Show only the last 4 characters
         masked_key = '•' * (len(api_key) - 4) + api_key[-4:] if len(api_key) > 4 else api_key
     
-    return jsonify({'api_key': masked_key, 'is_set': bool(api_key)}) 
+    return jsonify({'api_key': masked_key, 'is_set': bool(api_key)})
+
+@api_bp.route('/api/openai-stats', methods=['GET'])
+def get_openai_stats():
+    """Get OpenAI API usage statistics."""
+    # Get the OpenAI API request count
+    request_count = db.get_openai_request_count()
+    
+    return jsonify({
+        'request_count': request_count
+    }) 

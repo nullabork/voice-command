@@ -34,6 +34,12 @@ document.addEventListener('alpine:init', () => {
             isSet: false,
             apiKey: ''
         },
+        // OpenAI stats
+        openaiStats: {
+            requestCount: 0
+        },
+        // Triggered command tracking
+        triggeredCommandId: null,
 
         /**
          * Initializes the application
@@ -49,8 +55,16 @@ document.addEventListener('alpine:init', () => {
             // Get API key status
             this.fetchApiKeyStatus();
             
+            // Get OpenAI stats
+            this.fetchOpenAIStats();
+            
             // Connect to WebSocket
             this.connectWebSocket();
+            
+            // Set up auto-refresh of OpenAI stats
+            setInterval(() => {
+                this.fetchOpenAIStats();
+            }, 30000); // Refresh every 30 seconds
         },
 
         /**
@@ -90,6 +104,25 @@ document.addEventListener('alpine:init', () => {
                 }
             } catch (error) {
                 console.error('Error fetching API key status:', error);
+            }
+        },
+        
+        /**
+         * Fetches the OpenAI stats
+         */
+        async fetchOpenAIStats() {
+            try {
+                console.log('Fetching OpenAI stats...');
+                const response = await fetch('api/openai-stats');
+                if (response.ok) {
+                    const data = await response.json();
+                    this.openaiStats.requestCount = data.request_count;
+                    console.log('OpenAI request count:', this.openaiStats.requestCount);
+                } else {
+                    console.error('Failed to fetch OpenAI stats');
+                }
+            } catch (error) {
+                console.error('Error fetching OpenAI stats:', error);
             }
         },
 
@@ -471,6 +504,16 @@ document.addEventListener('alpine:init', () => {
                         success: data.success,
                         message: data.message
                     };
+                });
+                
+                // Listen for command triggered events
+                this.socket.on('command_triggered', (data) => {
+                    console.log('Command triggered:', data);
+                    // Set the triggered command ID to flash the row
+                    this.triggeredCommandId = data.command_id;
+                    
+                    // Refresh OpenAI stats if a command was triggered
+                    this.fetchOpenAIStats();
                 });
 
                 this.socket.on('disconnect', () => {

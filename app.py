@@ -8,6 +8,7 @@ from flask import Flask, request
 from flask_cors import CORS
 from flask_socketio import SocketIO
 import os
+import sys
 
 # Import app modules
 import db
@@ -25,6 +26,9 @@ app.register_blueprint(api_bp)
 
 # Store socketio as a global in the app context
 app.config['socketio'] = socketio
+
+# Flag to track if we've already initialized speech recognition
+speech_recognition_initialized = False
 
 # Store socketio in the app config for use in API routes
 @app.before_request
@@ -53,6 +57,8 @@ def handle_test_script(data):
 
 def initialize_app():
     """Initialize the application components."""
+    global speech_recognition_initialized
+    
     # Initialize the database
     db.init_db()
     
@@ -65,10 +71,17 @@ def initialize_app():
         print("WARNING: OpenAI API key not set. Sentiment analysis feature will not work.")
         print("You can set the OpenAI API key in the settings.")
     
+    # In debug mode, Werkzeug loads the app twice - once for the reloader and once for the app
+    # We only want to start speech recognition in the app instance (when WERKZEUG_RUN_MAIN is set)
+    if os.environ.get('WERKZEUG_RUN_MAIN') != 'true' and app.debug:
+        print("Skipping speech recognition start in reloader process")
+        return
+    
     # Check if active state is true, and start speech recognition if needed
     if db.get_active_state():
         print("Active state is true at startup, starting speech recognition...")
         start_speech_recognition(socketio)
+        speech_recognition_initialized = True
         print("Speech recognition started.")
     else:
         print("Active state is false at startup, speech recognition not started.")
@@ -79,4 +92,4 @@ if __name__ == '__main__':
     initialize_app()
     
     # Start the Flask application with SocketIO
-    socketio.run(app, host='0.0.0.0', port=5000, debug=True) 
+    socketio.run(app, host='0.0.0.0', port=5000, debug=False) 

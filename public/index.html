@@ -69,6 +69,16 @@
                     </div>
                 </div>
                 
+                <!-- OpenAI Stats Section -->
+                <div class="divider"></div>
+                <div class="stats bg-base-200 w-full">
+                    <div class="stat">
+                        <div class="stat-title">OpenAI API Requests</div>
+                        <div class="stat-value" x-text="openaiStats.requestCount">0</div>
+                        <div class="stat-desc">Total requests to OpenAI API</div>
+                    </div>
+                </div>
+                
                 <div class="modal-action">
                     <button class="btn" @click="showSettings = false">Close</button>
                 </div>
@@ -101,15 +111,29 @@
                     <table class="table table-zebra w-full">
                         <thead>
                             <tr>
+                                <th>Prefix</th>
                                 <th>Voice Phrases</th>
-                                <th>Action</th>
-                                <th>Sentiment</th>
+                                <th>Action</th>                                
                                 <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody>
                             <template x-for="command in commands" :key="command.id">
-                                <tr>
+                                <tr :id="'command-' + command.id" 
+                                    :class="{'triggered-command': triggeredCommandId === command.id}" 
+                                    @animationend="triggeredCommandId = null">
+
+                                    <td>
+                                        <span x-show="command.understand_sentiment" class="badge badge-accent">
+                                            <template x-if="command.sentiment_prefix">
+                                                <span x-text="command.sentiment_prefix"></span>
+                                            </template>
+                                            <template x-if="!command.sentiment_prefix">
+                                                <span>Enabled</span>
+                                            </template>
+                                        </span>
+                                    </td>
+
                                     <td>
                                         <div class="flex flex-wrap gap-1">
                                             <template x-for="phrase in command.phrases" :key="phrase">
@@ -122,16 +146,7 @@
                                             <button @click="previewScript(command.script)" class="btn btn-sm btn-ghost">Preview</button>
                                         </div>
                                     </td>
-                                    <td>
-                                        <span x-show="command.understand_sentiment" class="badge badge-accent">
-                                            <template x-if="command.sentiment_prefix">
-                                                <span x-text="command.sentiment_prefix"></span>
-                                            </template>
-                                            <template x-if="!command.sentiment_prefix">
-                                                <span>Enabled</span>
-                                            </template>
-                                        </span>
-                                    </td>
+                                    
                                     <td class="flex gap-2">
                                         <button @click="startEditing(command)" class="btn btn-sm btn-info">Edit</button>
                                         <button @click="deleteCommand(command.id)" class="btn btn-sm btn-error">Delete</button>
@@ -255,6 +270,17 @@
     <!-- Add this to handle Alpine initialization issues -->
     <style>
         [x-cloak] { display: none !important; }
+        
+        /* Command flash animation */
+        @keyframes command-flash {
+            0% { background-color: rgba(0, 255, 0, 0.1); }
+            50% { background-color: rgba(0, 255, 0, 0.3); }
+            100% { background-color: transparent; }
+        }
+        
+        .triggered-command {
+            animation: command-flash 1s ease-out;
+        }
     </style>
 </body>
 </html> 

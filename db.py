@@ -104,6 +104,8 @@ def init_db():
                   ('active', 'false'))
     cursor.execute('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)', 
                   ('openai_api_key', ''))
+    cursor.execute('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)', 
+                  ('openai_request_count', '0'))
     
     conn.commit()
     conn.close()
@@ -288,4 +290,39 @@ def set_openai_api_key(api_key):
     
     conn.commit()
     conn.close()
-    return True 
+    return True
+
+def get_openai_request_count():
+    """Get the OpenAI API request count from the database."""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    
+    cursor.execute('SELECT value FROM settings WHERE key = ?', ('openai_request_count',))
+    result = cursor.fetchone()
+    count = int(result[0]) if result else 0
+    
+    conn.close()
+    return count
+
+def increment_openai_request_count():
+    """Increment the OpenAI API request count in the database."""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    
+    # Get current count
+    cursor.execute('SELECT value FROM settings WHERE key = ?', ('openai_request_count',))
+    result = cursor.fetchone()
+    current_count = int(result[0]) if result else 0
+    
+    # Increment count
+    new_count = current_count + 1
+    
+    # Update in database
+    cursor.execute(
+        'UPDATE settings SET value = ? WHERE key = ?',
+        (str(new_count), 'openai_request_count')
+    )
+    
+    conn.commit()
+    conn.close()
+    return new_count 

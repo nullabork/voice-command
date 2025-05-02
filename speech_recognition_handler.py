@@ -8,7 +8,7 @@ import speech_recognition as sr
 import json
 import os
 import requests
-from db import get_command_mappings, get_active_state, set_active_state, get_sentiment_commands
+from db import get_command_mappings, get_active_state, set_active_state, get_sentiment_commands, increment_openai_request_count, get_commands
 from input_simulation import execute_script
 
 # Global flag for stopping the speech recognition thread
@@ -16,6 +16,11 @@ stop_listening = False
 speech_thread = None
 last_thread_health_check = 0
 health_check_interval = 10  # seconds
+
+# Command debounce tracking
+last_command_time = 0
+last_command_phrase = None
+COMMAND_DEBOUNCE_TIME = 2.0  # seconds
 
 # OpenAI API settings
 OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY', '')
@@ -50,7 +55,7 @@ def check_phrase_match(text, command_phrases):
 def check_sentiment_match(text, sentiment_commands):
     """Check if the text matches any sentiment-based command using ChatGPT."""
     if not text or not sentiment_commands:
-        return None, None
+        return None, None, None
     
     text = text.lower()
     print(f"Checking for sentiment matches in: '{text}'")
@@ -72,7 +77,7 @@ def check_sentiment_match(text, sentiment_commands):
         if len(commands) == 1:
             cmd = commands[0]
             print(f"Only one command with prefix '{prefix}', using it")
-            return cmd['phrases'][0], cmd['script']
+            return cmd['id'], cmd['phrases'][0], cmd['script']
         
         # Format commands for the API
         formatted_commands = []
@@ -85,7 +90,7 @@ def check_sentiment_match(text, sentiment_commands):
         # Use ChatGPT to determine the best match
         if not OPENAI_API_KEY:
             print("ERROR: OpenAI API key not set. Set OPENAI_API_KEY environment variable.")
-            return None, None
+            return None, None, None
             
         try:
             headers = {
@@ -116,6 +121,9 @@ Which command best matches what the user said? Respond with ONLY the exact comma
             response = requests.post(OPENAI_API_URL, headers=headers, data=json.dumps(data), timeout=5)
             response.raise_for_status()
             
+            # Increment the OpenAI request count
+            increment_openai_request_count()
+            
             result = response.json()
             matched_phrase = result['choices'][0]['message']['content'].strip()
             
@@ -123,7 +131,7 @@ Which command best matches what the user said? Respond with ONLY the exact comma
             
             # If no match was found, return None
             if matched_phrase == "NO_MATCH":
-                return None, None
+                return None, None, None
             
             # Find the command that matches the suggested phrase
             for cmd in commands:
@@ -135,18 +143,34 @@ Which command best matches what the user said? Respond with ONLY the exact comma
                         
                     if clean_match.lower() == phrase.lower():
                         print(f"Found matching command: '{phrase}'")
-                        return phrase, cmd['script']
+                        return cmd['id'], phrase, cmd['script']
             
             print(f"Couldn't find a command that matches ChatGPT's suggestion: '{matched_phrase}'")
-            return None, None
+            return None, None, None
             
         except Exception as e:
             print(f"Error calling OpenAI API: {e}")
             traceback.print_exc()
-            return None, None
+            return None, None, None
             
     print("No sentiment matches found.")
-    return None, None
+    return None, None, None
+
+def should_execute_command(phrase):
+    """Check if we should execute this command based on debounce rules."""
+    global last_command_time, last_command_phrase
+    
+    current_time = time.time()
+    
+    # If it's the same command and within the debounce time, don't execute
+    if phrase == last_command_phrase and current_time - last_command_time < COMMAND_DEBOUNCE_TIME:
+        print(f"Debouncing command '{phrase}' - too soon after last execution")
+        return False
+    
+    # Update the last command time and phrase
+    last_command_time = current_time
+    last_command_phrase = phrase
+    return True
 
 def speech_recognition_loop(socketio=None):
     """Main loop for speech recognition."""
@@ -154,7 +178,7 @@ def speech_recognition_loop(socketio=None):
     
     # Initialize recognizer
     r = sr.Recognizer()
-    
+    print("Recognizer initialized")
     try:
         # Get microphone as source
         with sr.Microphone() as source:
@@ -169,7 +193,7 @@ def speech_recognition_loop(socketio=None):
                         print("Active state is false, stopping speech recognition loop.")
                         break
                     
-                    print("Listening for commands...")
+                    # print("Listening for commands...")
                     
                     # Listen for audio with a timeout
                     audio = r.listen(source, timeout=5)
@@ -188,36 +212,62 @@ def speech_recognition_loop(socketio=None):
                         
                         # First, check for exact matches
                         matched_phrase, script = check_phrase_match(text, command_phrases)
+                        command_id = None
+                        
+                        # Get the command ID for the match
+                        if matched_phrase:
+                            # Find command ID by phrase
+                            for cmd in get_commands():
+                                if matched_phrase in cmd['phrases']:
+                                    command_id = cmd['id']
+                                    break
                         
                         # If no exact match, try sentiment matching
                         if not matched_phrase:
                             sentiment_commands = get_sentiment_commands()
                             if sentiment_commands:
-                                matched_phrase, script = check_sentiment_match(text, sentiment_commands)
+                                command_id, matched_phrase, script = check_sentiment_match(text, sentiment_commands)
                         
                         # Execute the matched command if found
-                        if matched_phrase:
-                            print(f"Executing command for phrase: '{matched_phrase}'")
-                            print(f"Script to execute: {script}")
-                            execute_script(script)
+                        if matched_phrase and script:
+                            # Check if we should execute this command (debounce)
+                            if should_execute_command(matched_phrase):
+                                print(f"Executing command for phrase: '{matched_phrase}'")
+                                print(f"Script to execute: {script}")
+                                
+                                # Notify clients that a command was triggered
+                                if socketio and command_id:
+                                    socketio.emit('command_triggered', {
+                                        'command_id': command_id,
+                                        'phrase': matched_phrase
+                                    })
+                                
+                                # Execute the script
+                                execute_script(script)
+                            else:
+                                print(f"Skipping execution of '{matched_phrase}' due to debounce rules")
                         else:
                             print("No matching command found for the recognized speech.")
                     
-                    except sr.UnknownValueError:
-                        print("Could not understand audio")
+                    #except sr.UnknownValueError:
+                    #    print("Could not understand audio")
                     except sr.RequestError as e:
-                        print(f"Recognition service error: {e}")
+                        # print(f"Recognition service error: {e}")
+                        # traceback.print_exc()
+                        time.sleep(1)
                     except Exception as e:
-                        print(f"Unexpected error in speech recognition: {e}")
-                        traceback.print_exc()
+                        # print(f"Unexpected error in speech recognition: {e}")
+                        # traceback.print_exc()
+                        time.sleep(1)
                 
                 except Exception as e:
-                    print(f"Error in speech recognition loop: {e}")
-                    traceback.print_exc()
+                    # print(f"Error in speech recognition loop: {e}")
+                    # traceback.print_exc()
                     time.sleep(1)  # Prevent tight loop on recurring errors
     except Exception as e:
-        print(f"Critical error in speech recognition thread: {e}")
-        traceback.print_exc()
+        # print(f"Critical error in speech recognition thread: {e}")
+        # traceback.print_exc()
+        time.sleep(1)
 
 def check_thread_health(socketio=None):
     """Check if speech recognition thread is healthy and restart if needed."""
@@ -245,7 +295,7 @@ def check_thread_health(socketio=None):
 def start_speech_recognition(socketio=None):
     """Start speech recognition in a background thread."""
     global speech_thread, stop_listening
-    
+    print("Starting speech recognition thread")
     # First, stop any existing thread
     if speech_thread is not None and speech_thread.is_alive():
         print("Stopping existing speech recognition thread.")

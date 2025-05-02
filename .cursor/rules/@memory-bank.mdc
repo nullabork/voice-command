@@ -1,0 +1,98 @@
+---
+description: memory bank reference
+globs: 
+alwaysApply: false
+---
+<!-- @metaTitle Memory Bank Rules -->
+<!-- @metaDescription Rules for maintaining and using the Memory Bank -->
+<!-- @skipInSummary -->
+
+<memo>
+# Memory Bank Guidelines
+
+The Memory Bank is my sole source of project information between sessions. At the start of every task, I MUST read ALL Memory Bank files to understand the project context and current state.
+
+## Core Files
+
+I MUST read these files in the following order:
+
+1. **[projectbrief.md](mdc:../memory-bank/projectbrief.md)** - Fundamental project goals and scope
+   - Foundation for all other documentation
+   - Defines core requirements and integration needs
+   - Reference for project scope decisions
+
+2. **[productContext.md](mdc:../memory-bank/productContext.md)** - User needs and problem space
+   - Explains why this project exists
+   - Details user experience goals
+   - Describes key use cases
+
+3. **[systemPatterns.md](mdc:../memory-bank/systemPatterns.md)** - Architecture and design patterns
+   - System architecture diagram
+   - Design patterns in use
+   - Module interactions and flows
+   - Threading model
+
+4. **[techContext.md](mdc:../memory-bank/techContext.md)** - Technical implementation details
+   - Technologies and libraries
+   - Database schema
+   - Development environment
+   - File structure
+   - Technical constraints
+
+5. **[activeContext.md](mdc:../memory-bank/activeContext.md)** - Current development status
+   - Current focus areas
+   - Recent changes
+   - Upcoming priorities
+   - Active decisions
+   - Design preferences
+
+6. **[progress.md](mdc:../memory-bank/progress.md)** - Project progress tracking
+   - Completed features
+   - In-progress work
+   - Pending features
+   - Known issues
+   - Technical debt
+   - Next development phases
+
+7. **[requirements.md](mdc:../memory-bank/requirements.md)** - Detailed requirements
+   - Core functionality requirements
+   - Configuration and management specifications
+   - Script format requirements
+   - Non-functional requirements
+
+8. **[tech-stack.md](mdc:../memory-bank/tech-stack.md)** - Technology stack details
+   - Backend technologies
+   - Frontend technologies
+   - Architecture specifics
+   - Communication protocols
+
+## Memory Bank Workflows
+
+### Memory Reset Protocol
+1. At the start of EVERY session, read ALL Memory Bank files
+2. Reference specific files when addressing particular aspects of the project
+3. Update memory files when:
+   - New implementation patterns are discovered
+   - Requirements change
+   - Technical decisions are made
+   - Progress milestones are reached
+
+### Update Procedure
+When updating Memory Bank files:
+1. Review the current content for accuracy
+2. Update information reflecting current state
+3. Maintain chronological records of major decisions
+4. Focus particularly on activeContext.md and progress.md
+5. Ensure all files remain consistent with each other
+
+## Key Principles
+
+1. The Memory Bank is the SINGLE SOURCE OF TRUTH
+2. No implementation decisions should contradict Memory Bank documentation
+3. All critical insights must be documented for future reference
+4. Documentation should be kept concise yet complete
+5. Updates should be made immediately when significant changes occur
+
+REMEMBER: I depend entirely on these files between sessions. Their accuracy and completeness are critical to my ability to assist effectively with this project.
+</memo>
+
