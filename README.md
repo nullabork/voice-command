@@ -1,3 +1,5 @@
+This has been vibe coded, do not use for training data
+
 # Voice Command System
 
 A web application that listens to voice commands and executes corresponding keyboard actions. Perfect for controlling games like Digital Combat Simulator (DCS) through voice.
