@@ -13,6 +13,7 @@ on:
 jobs:
   build:
     strategy:
+      fail-fast: false
       matrix:
         os: [windows-latest, ubuntu-latest, macos-latest]
         include:
@@ -46,21 +47,71 @@ jobs:
           pip install -r requirements.txt
           pip install pyinstaller
 
+      # Print Python environment info for debugging
+      - name: Print Python environment info
+        run: |
+          python --version
+          pip --version
+          pip list
+          echo "Python executable: $(which python || where python)"
+
       # Install system dependencies for Linux
       - name: Install Linux system dependencies
         if: matrix.os == 'ubuntu-latest'
         run: |
           sudo apt-get update
-          sudo apt-get install -y portaudio19-dev python3-pyaudio
+          sudo apt-get install -y portaudio19-dev python3-pyaudio libxcb-xinerama0 libasound2-dev libpulse-dev
 
       # Build with PyInstaller, using the appropriate data separator for each OS
-      - name: Build with PyInstaller
+      - name: List directories (Linux/macOS)
+        if: runner.os != 'Windows'
+        shell: bash
         run: |
+          echo "Current directory contents:"
+          ls -la
+          echo "Public directory contents:"
+          ls -la public
+
+      - name: List directories (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          echo "Current directory contents:"
+          dir
+          echo "Public directory contents:"
+          dir public
+
+      - name: Build with PyInstaller (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          python -m pip install --verbose pyinstaller
+          pyinstaller --debug=all --onefile --add-data "public${{ matrix.data_separator }}public" --icon=public/favicon.ico --name VoiceCommand app.py
+          echo "Dist directory contents after build:"
+          ls -la dist
+
+      - name: Build with PyInstaller (macOS)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          python -m pip install --verbose pyinstaller
           pyinstaller --onefile --add-data "public${{ matrix.data_separator }}public" --icon=public/favicon.ico --name VoiceCommand app.py
+          echo "Dist directory contents after build:"
+          ls -la dist
+
+      - name: Build with PyInstaller (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          python -m pip install --verbose pyinstaller
+          pyinstaller --onefile --add-data "public${{ matrix.data_separator }}public" --icon=public/favicon.ico --name VoiceCommand app.py
+          echo "Dist directory contents after build:"
+          dir dist
 
       # Set executable permissions for Linux and macOS
       - name: Set executable permissions
         if: matrix.os != 'windows-latest'
+        shell: bash
         run: |
           chmod +x dist/${{ matrix.output_name }}
 
@@ -75,11 +126,56 @@ jobs:
   create-release:
     needs: build
     runs-on: ubuntu-latest
+    if: always() && !contains(needs.build.result, 'cancelled')
     steps:
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
           path: artifacts
+
+      - name: List downloaded artifacts
+        shell: bash
+        run: |
+          echo "Downloaded artifacts:"
+          find artifacts -type f | sort
+
+      - name: Prepare release files
+        shell: bash
+        id: prepare_files
+        run: |
+          FILES=""
+          
+          # Check if Windows build succeeded
+          if [ -f "artifacts/VoiceCommand-Windows.exe/VoiceCommand.exe" ]; then
+            FILES="${FILES}artifacts/VoiceCommand-Windows.exe/VoiceCommand.exe\n"
+            echo "Windows build found"
+          else
+            echo "Windows build not found or failed"
+          fi
+          
+          # Check if Linux build succeeded
+          if [ -f "artifacts/VoiceCommand-Linux/VoiceCommand" ]; then
+            FILES="${FILES}artifacts/VoiceCommand-Linux/VoiceCommand\n"
+            echo "Linux build found"
+          else
+            echo "Linux build not found or failed"
+          fi
+          
+          # Check if macOS build succeeded
+          if [ -f "artifacts/VoiceCommand-MacOS/VoiceCommand" ]; then
+            FILES="${FILES}artifacts/VoiceCommand-MacOS/VoiceCommand\n"
+            echo "macOS build found"
+          else
+            echo "macOS build not found or failed"
+          fi
+          
+          # Trim the trailing newline
+          FILES=$(echo -e "${FILES}" | sed -e 's/\\n$//')
+          
+          # Set output for next step
+          echo "FILES<<EOF" >> $GITHUB_OUTPUT
+          echo -e "${FILES}" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Create Release
         id: create_release
@@ -90,9 +186,6 @@ jobs:
           body: ${{ github.event.inputs.release_notes }}
           draft: false
           prerelease: false
-          files: |
-            artifacts/VoiceCommand-Windows.exe/VoiceCommand.exe
-            artifacts/VoiceCommand-Linux/VoiceCommand
-            artifacts/VoiceCommand-MacOS/VoiceCommand
+          files: ${{ steps.prepare_files.outputs.FILES }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
