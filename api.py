@@ -4,7 +4,7 @@ API routes module for voice command application.
 from flask import Blueprint, request, jsonify, send_from_directory, current_app
 import db
 import os
-from speech_recognition_handler import start_speech_recognition, stop_speech_recognition, update_openai_api_key
+from speech_recognition_handler import start_speech_recognition, stop_speech_recognition, update_openai_api_key, toggle_sentiment_mode, get_sentiment_mode_state, execute_script, get_scripts_execution_state, toggle_scripts_execution
 
 # Create the API blueprint
 api_bp = Blueprint('api', __name__)
@@ -39,15 +39,17 @@ def add_command():
     if not phrases:
         return jsonify({'error': 'At least one phrase is required'}), 400
     
-    # Get sentiment analysis fields
+    # Get sentiment analysis field
     understand_sentiment = data.get('understand_sentiment', False)
-    sentiment_prefix = data.get('sentiment_prefix', '')
+    
+    # Get partial match field
+    partial_match = data.get('partial_match', False)
     
     command_id = db.add_command(
         phrases, 
         data['script'], 
-        understand_sentiment=understand_sentiment, 
-        sentiment_prefix=sentiment_prefix
+        understand_sentiment=understand_sentiment,
+        partial_match=partial_match
     )
     
     return jsonify({
@@ -56,7 +58,7 @@ def add_command():
         'phrase': phrases[0],  # For backward compatibility
         'script': data['script'],
         'understand_sentiment': understand_sentiment,
-        'sentiment_prefix': sentiment_prefix
+        'partial_match': partial_match
     }), 201
 
 @api_bp.route('/api/commands/<int:command_id>', methods=['PUT'])
@@ -74,16 +76,18 @@ def update_command(command_id):
     if not phrases:
         return jsonify({'error': 'At least one phrase is required'}), 400
     
-    # Get sentiment analysis fields
+    # Get sentiment analysis field
     understand_sentiment = data.get('understand_sentiment', False)
-    sentiment_prefix = data.get('sentiment_prefix', '')
+    
+    # Get partial match field
+    partial_match = data.get('partial_match', False)
     
     success = db.update_command(
         command_id, 
         phrases, 
         data['script'],
         understand_sentiment=understand_sentiment,
-        sentiment_prefix=sentiment_prefix
+        partial_match=partial_match
     )
     
     if not success:
@@ -95,7 +99,7 @@ def update_command(command_id):
         'phrase': phrases[0],  # For backward compatibility
         'script': data['script'],
         'understand_sentiment': understand_sentiment,
-        'sentiment_prefix': sentiment_prefix
+        'partial_match': partial_match
     })
 
 @api_bp.route('/api/commands/<int:command_id>', methods=['DELETE'])
@@ -107,70 +111,160 @@ def delete_command(command_id):
     
     return jsonify({'message': 'Command deleted successfully'}), 200
 
-@api_bp.route('/api/toggle', methods=['GET', 'POST'])
-def toggle_active_state():
-    # Get socketio from Flask app config
-    socketio = current_app.config.get('socketio')
-    if not socketio:
-        socketio = request.environ.get('socketio')
-        
-    print(f"SocketIO available in toggle route: {socketio is not None}")
-    
-    if request.method == 'POST':
-        data = request.get_json()
-        if 'active' in data:
-            active_value = data['active']
-            db.set_active_state(active_value)
-            
-            # Start or stop the speech recognition thread based on active state
-            if active_value:
-                print("Starting speech recognition...")
-                start_speech_recognition(socketio)
-            else:
-                print("Stopping speech recognition...")
-                stop_speech_recognition()
-    
+@api_bp.route('/api/active', methods=['GET'])
+def get_active():
     active = db.get_active_state()
+    return jsonify({'active': active})
+
+@api_bp.route('/api/active', methods=['POST'])
+def set_active():
+    data = request.get_json()
+    if 'active' not in data:
+        return jsonify({'error': 'Missing active state'}), 400
+    
+    active = data['active']
+    db.set_active_state(active)
+    
+    if active:
+        # Start speech recognition with socketio instance
+        socketio = request.environ.get('socketio')
+        start_speech_recognition(socketio)
+    else:
+        # Stop speech recognition
+        stop_speech_recognition()
     
     return jsonify({'active': active})
 
-@api_bp.route('/api/openai-key', methods=['GET', 'POST'])
-def manage_openai_api_key():
-    """Get or set the OpenAI API key."""
-    if request.method == 'POST':
-        data = request.get_json()
-        if 'api_key' in data:
-            api_key = data['api_key']
-            # Store the API key in the database
-            db.set_openai_api_key(api_key)
-            
-            # Update the environment variable for the current session
-            os.environ['OPENAI_API_KEY'] = api_key
-            
-            # Update the API key in the speech recognition handler
-            update_openai_api_key(api_key)
-            
-            return jsonify({'success': True, 'message': 'API key updated successfully'})
-        else:
-            return jsonify({'error': 'Missing API key'}), 400
-    
-    # GET method - return the current API key
+@api_bp.route('/api/openai-key', methods=['GET'])
+def get_openai_key_status():
     api_key = db.get_openai_api_key()
+    is_set = bool(api_key)
     
-    # Return a masked version of the API key for security
-    masked_key = ''
-    if api_key:
-        # Show only the last 4 characters
-        masked_key = '•' * (len(api_key) - 4) + api_key[-4:] if len(api_key) > 4 else api_key
+    # Mask the API key for security
+    masked_key = ""
+    if api_key and len(api_key) > 4:
+        masked_key = '*' * (len(api_key) - 4) + api_key[-4:]
+    elif api_key:
+        masked_key = api_key  # Don't mask if it's too short
     
-    return jsonify({'api_key': masked_key, 'is_set': bool(api_key)})
+    return jsonify({
+        'isSet': is_set,
+        'apiKey': masked_key
+    })
+
+@api_bp.route('/api/openai-key', methods=['POST'])
+def set_openai_key():
+    data = request.get_json()
+    if 'apiKey' not in data:
+        return jsonify({'error': 'Missing API key'}), 400
+    
+    api_key = data['apiKey']
+    db.set_openai_api_key(api_key)
+    
+    # Update the API key in the speech recognition handler
+    update_openai_api_key(api_key)
+    
+    return jsonify({'success': True})
 
 @api_bp.route('/api/openai-stats', methods=['GET'])
 def get_openai_stats():
-    """Get OpenAI API usage statistics."""
-    # Get the OpenAI API request count
     request_count = db.get_openai_request_count()
-    
     return jsonify({
-        'request_count': request_count
-    }) 
+        'requestCount': request_count
+    })
+
+@api_bp.route('/api/shortcut-key', methods=['GET'])
+def get_shortcut_key():
+    shortcut_key = db.get_global_shortcut_key()
+    return jsonify({
+        'shortcutKey': shortcut_key
+    })
+
+@api_bp.route('/api/shortcut-key', methods=['POST'])
+def set_shortcut_key():
+    data = request.get_json()
+    if 'shortcutKey' not in data:
+        return jsonify({'error': 'Missing shortcut key'}), 400
+    
+    shortcut_key = data['shortcutKey']
+    db.set_global_shortcut_key(shortcut_key)
+    
+    return jsonify({'success': True})
+
+@api_bp.route('/api/sentiment-mode', methods=['GET'])
+def get_sentiment_mode():
+    active = get_sentiment_mode_state()
+    return jsonify({'active': active})
+
+@api_bp.route('/api/sentiment-mode', methods=['POST'])
+def set_sentiment_mode():
+    data = request.get_json()
+    if 'active' not in data:
+        return jsonify({'error': 'Missing active state'}), 400
+    
+    active = data['active']
+    new_state = toggle_sentiment_mode() if active != get_sentiment_mode_state() else get_sentiment_mode_state()
+    
+    return jsonify({'active': new_state})
+
+@api_bp.route('/api/ai-timeout', methods=['GET'])
+def get_ai_timeout():
+    """Get AI mode timeout settings."""
+    timeout_settings = db.get_ai_timeout_settings()
+    return jsonify(timeout_settings)
+
+@api_bp.route('/api/ai-timeout', methods=['POST'])
+def update_ai_timeout():
+    try:
+        data = request.get_json()
+        enabled = data.get('enabled', False)
+        seconds = data.get('seconds', 60)
+        
+        db.update_ai_timeout_setting(enabled, seconds)
+        
+        # No need to call update_ai_timeout_state since the settings will be read from the DB when needed
+        
+        print(f"Updated AI timeout: enabled={enabled}, seconds={seconds}")
+        return jsonify({'success': True, 'enabled': enabled, 'seconds': seconds})
+    except Exception as e:
+        print(f"Error updating AI timeout: {str(e)}")
+        return jsonify({'error': str(e)}), 400
+
+@api_bp.route('/api/scripts-execution', methods=['GET'])
+def get_scripts_execution():
+    """Get the current scripts execution state."""
+    try:
+        active = get_scripts_execution_state()
+        return jsonify({'active': active})
+    except Exception as e:
+        print(f"Error getting scripts execution state: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@api_bp.route('/api/scripts-execution', methods=['POST'])
+def toggle_scripts_execution_api():
+    """Toggle the scripts execution state."""
+    try:
+        active = toggle_scripts_execution()
+        
+        # If socketio is available, emit the event
+        socketio = request.environ.get('socketio')
+        if socketio:
+            socketio.emit('scripts_execution', {'active': active})
+        
+        return jsonify({'active': active})
+    except Exception as e:
+        print(f"Error toggling scripts execution: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@api_bp.route('/api/script-preview', methods=['POST'])
+def preview_script():
+    data = request.get_json()
+    if 'script' not in data:
+        return jsonify({'error': 'Missing script'}), 400
+    
+    try:
+        # Execute the script, with a flag indicating this is just a preview
+        result = execute_script(data['script'], preview_mode=True)
+        return jsonify({'success': True, 'result': result})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500 

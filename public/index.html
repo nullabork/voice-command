@@ -21,9 +21,17 @@
 <body class="bg-base-200 min-h-screen">
     <div class="container mx-auto p-4" x-data="voiceCommandApp" x-cloak>
         <!-- Header -->
-        <header class="text-center py-8">
+        <header class="text-left py-8 relative">
             <h1 class="text-3xl font-bold text-primary">Voice Command System</h1>
             <p class="text-base-content mt-2">Control your applications with voice commands</p>
+            
+            <!-- Help Button (Always accessible) -->
+            <button @click="showHelp = true" class="btn btn-info absolute right-2 top-2 md:right-8 md:top-8">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                Help
+            </button>
         </header>
         
         <!-- Preview Result Toast -->
@@ -54,10 +62,10 @@
                         />
                         <button @click="saveApiKey()" class="btn btn-primary">Save</button>
                     </div>
-                    <label class="label">
+                    <label class="label overflow-x-auto">
                         <span class="label-text-alt" x-show="apiKeyStatus.isSet">
                             <span class="text-success">✓ API key is set</span>
-                            <span x-text="'(' + apiKeyStatus.apiKey + ')'"></span>
+                            <span  x-text="'(' + apiKeyStatus.apiKey + ')'"></span>
                         </span>
                         <span class="label-text-alt text-error" x-show="!apiKeyStatus.isSet">
                             ✗ No API key set - sentiment analysis will not work
@@ -66,6 +74,69 @@
                     <div class="text-xs mt-2">
                         <p>You can get an OpenAI API key from <a href="https://platform.openai.com/api-keys" target="_blank" class="link">platform.openai.com/api-keys</a></p>
                         <p>The API key is stored securely in the database and used only for the sentiment analysis feature.</p>
+                    </div>
+                </div>
+                
+                <!-- Global Shortcut Key Setting -->
+                <!-- <div class="form-control w-full mt-6">
+                    <label class="label">
+                        <span class="label-text">Global Shortcut Key</span>
+                        <span class="label-text-alt">Activates sentiment mode</span>
+                    </label>
+                    <div class="flex gap-2">
+                        <input 
+                            type="text" 
+                            x-model="shortcutKeyInput" 
+                            placeholder="Click 'Capture' to set shortcut" 
+                            class="input input-bordered w-full" 
+                            readonly
+                        />
+                        <button @click="captureShortcutKey()" class="btn btn-accent" :class="{'btn-secondary': listeningForShortcut}">
+                            <span x-text="listeningForShortcut ? 'Listening...' : 'Capture'"></span>
+                        </button>
+                        <button @click="saveShortcutKey()" class="btn btn-primary">Save</button>
+                    </div>
+                    <label class="label">
+                        <span class="label-text-alt" x-show="shortcutKey">
+                            <span class="text-success">✓ Shortcut key is set to</span>
+                            <span x-text="shortcutKey" class="font-mono"></span>
+                        </span>
+                        <span class="label-text-alt text-warning" x-show="!shortcutKey">
+                            No shortcut key set
+                        </span>
+                    </label>
+                    <div class="text-xs mt-2">
+                        <p>When you press this shortcut key, sentiment mode will be toggled on/off.</p>
+                        <p>In sentiment mode, all spoken commands will be processed by ChatGPT to find the best matching command, without requiring specific keywords.</p>
+                    </div>
+                </div> -->
+                
+                <!-- AI Mode Timeout Settings -->
+                <div class="form-control w-full mt-6">
+                    <label class="label">
+                        <span class="label-text">AI Mode Timeout</span>
+                        <span class="label-text-alt">Automatically turn off AI mode</span>
+                    </label>
+                    <div class="flex gap-2 items-center">
+                        <input 
+                            type="checkbox" 
+                            x-model="aiTimeout.enabled" 
+                            class="checkbox checkbox-warning"
+                        />
+                        <span class="label-text">Enable timeout</span>
+                        <input 
+                            type="number" 
+                            x-model="aiTimeout.seconds" 
+                            min="1" 
+                            class="input input-bordered w-20 ml-4" 
+                            :disabled="!aiTimeout.enabled"
+                        />
+                        <span class="label-text">seconds</span>
+                        <button @click="saveAiTimeout()" class="btn btn-primary ml-2">Save</button>
+                    </div>
+                    <div class="text-xs mt-2">
+                        <p>When enabled, AI mode will automatically turn off after the specified timeout period.</p>
+                        <p>This is useful to prevent leaving AI mode on unintentionally, which could use up your API quota.</p>
                     </div>
                 </div>
                 
@@ -80,7 +151,197 @@
                 </div>
                 
                 <div class="modal-action">
-                    <button class="btn" @click="showSettings = false">Close</button>
+                    <button class="btn btn-sm" @click="showSettings = false">Close</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Comprehensive Help Modal -->
+        <div x-show="showHelp" class="modal modal-open z-50">
+            <div class="modal-box w-11/12 max-w-5xl max-h-[90vh] overflow-y-auto">
+                <div class="modal-action">
+                    <button class="btn btn-primary btn-sm" @click="showHelp = false">Close Help</button>
+                </div>
+
+                <h2 class="text-2xl font-bold text-center mb-4">Voice Command System Help</h2>
+                
+                <div class="divider">Core Concepts</div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- Voice Commands -->
+                    <div class="card bg-base-200 shadow-md">
+                        <div class="card-body">
+                            <h3 class="card-title">Voice Commands</h3>
+                            <p>The system listens for your voice and executes actions when it recognizes a command phrase.</p>
+                            <ul class="list-disc pl-5 space-y-1 mt-2">
+                                <li>Create commands with specific phrases to trigger them</li>
+                                <li>Each command executes a script of keyboard actions</li>
+                                <li>Commands appear in the list on the left side of the screen</li>
+                            </ul>
+                        </div>
+                    </div>
+                    
+                    <!-- Matching Modes -->
+                    <div class="card bg-base-200 shadow-md">
+                        <div class="card-body">
+                            <h3 class="card-title">Matching Modes</h3>
+                            <p>Three ways to match your voice to commands:</p>
+                            <ol class="list-decimal pl-5 space-y-1 mt-2">
+                                <li>
+                                    <span class="font-semibold">Exact Match:</span> 
+                                    Your phrase must appear exactly in what you say (always active)
+                                </li>
+                                <li>
+                                    <span class="font-semibold">Partial Match:</span> 
+                                    Enable this per command to match if phrase appears anywhere in speech
+                                </li>
+                                <li>
+                                    <span class="font-semibold">AI Mode:</span> 
+                                    Uses OpenAI to understand command intent even with different phrasing
+                                </li>
+                            </ol>
+                            <div class="alert alert-info mt-3 text-sm">
+                                <div>
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="stroke-current shrink-0 w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                    <p><strong>When using AI Mode:</strong> Your phrases should be treated as descriptions of what the command does, rather than exact text to match. This helps the AI better understand the intent of your command.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="divider">System Controls</div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <!-- Listening Toggle -->
+                    <div class="card bg-base-200 shadow-md">
+                        <div class="card-body">
+                            <h3 class="card-title">Listening Toggle</h3>
+                            <div class="badge badge-success mb-2">Listening</div>
+                            <div class="badge badge-error mb-4">Not Active</div>
+                            <p>Toggle whether the system is actively listening for commands.</p>
+                            <p class="text-sm mt-2">When disabled, the system completely stops listening for voice input.</p>
+                        </div>
+                    </div>
+                    
+                    <!-- AI Mode -->
+                    <div class="card bg-base-200 shadow-md">
+                        <div class="card-body">
+                            <h3 class="card-title">AI Mode</h3>
+                            <div class="badge badge-warning mb-2">AI Mode On</div>
+                            <div class="badge badge-warning mb-4 badge-outline">AI Mode Off</div>
+
+                            <p>Enables intelligent command matching using OpenAI.</p>
+                            <p class="text-sm mt-2">Toggle with the AI button.</p>
+                            <p class="text-sm mt-1">AI Mode can automatically turn off after a timeout period (configure in settings).</p>
+                        </div>
+                    </div>
+                    
+                    <!-- Script Execution -->
+                    <div class="card bg-base-200 shadow-md">
+                        <div class="card-body">
+                            <h3 class="card-title">Script Execution</h3>
+                            <div class="badge badge-success mb-2">Scripts On</div>
+                            <div class="badge badge-error mb-4">Scripts Off</div>
+                            <p>Controls whether recognized commands execute their scripts.</p>
+                            <p class="text-sm mt-2">Even when scripts are off, the system still listens and recognizes commands.</p>
+                            <p class="text-sm mt-1">Use <code>scripts_on()</code> and <code>scripts_off()</code> functions to control this.</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="divider">Keyboard Scripts</div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- Script Syntax -->
+                    <div class="card bg-base-200 shadow-md">
+                        <div class="card-body">
+                            <h3 class="card-title">Script Syntax</h3>
+                            <p>Scripts are a sequence of commands executed when a voice command is recognized:</p>
+                            <ul class="pl-5 space-y-2 mt-2">
+                                <li><code class="bg-base-300 px-1 rounded">-- comment</code> or <code class="bg-base-300 px-1 rounded"># comment</code>: Add comments</li>
+                                <li><code class="bg-base-300 px-1 rounded">100ms</code> or <code class="bg-base-300 px-1 rounded">1s</code>: Add delays</li>
+                                <li><code class="bg-base-300 px-1 rounded">type "text"</code>: Type text</li>
+                                <li><code class="bg-base-300 px-1 rounded">ctrl+shift+a</code>: Press key combinations</li>
+                                <li><code class="bg-base-300 px-1 rounded">enter</code>, <code class="bg-base-300 px-1 rounded">escape</code>: Press single keys</li>
+                            </ul>
+                        </div>
+                    </div>
+                    
+                    <!-- Special Functions -->
+                    <div class="card bg-base-200 shadow-md">
+                        <div class="card-body">
+                            <h3 class="card-title">Special Functions</h3>
+                            <p>Control system features from within scripts:</p>
+                            <ul class="pl-5 space-y-2 mt-2">
+                                <li><code class="bg-base-300 px-1 rounded">sentiment_on()</code>: Activate AI mode</li>
+                                <li><code class="bg-base-300 px-1 rounded">sentiment_off()</code>: Deactivate AI mode</li>
+                                <li><code class="bg-base-300 px-1 rounded">scripts_on()</code>: Enable script execution</li>
+                                <li><code class="bg-base-300 px-1 rounded">scripts_off()</code>: Disable script execution</li>
+                            </ul>
+                            <p class="text-sm mt-3">Note: Even when scripts are disabled, a script containing <code>scripts_on()</code> will still execute.</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="divider">Script Examples</div>
+                
+                <div class="card bg-base-200 shadow-md mb-6">
+                    <div class="card-body">
+                        <h3 class="card-title">Example Scripts</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <p class="font-semibold">Open a new browser tab and go to Google</p>
+                                <pre class="bg-base-300 p-2 rounded mt-1 text-sm">
+-- Open a new browser tab
+ctrl+t
+-- Wait a moment for the tab to open
+500ms
+-- Type the URL
+type "google.com"
+-- Press Enter to navigate
+enter
+                                </pre>
+                            </div>
+                            <div>
+                                <p class="font-semibold">Save current file and disable scripts</p>
+                                <pre class="bg-base-300 p-2 rounded mt-1 text-sm">
+-- Save the current file
+ctrl+s
+-- Wait for save to complete
+1s
+-- Turn off script execution for safety
+scripts_off()
+-- Show feedback message
+type "Scripts disabled for safety"
+                                </pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="divider">Settings</div>
+                
+                <div class="card bg-base-200 shadow-md mb-6">
+                    <div class="card-body">
+                        <h3 class="card-title">Settings Configuration</h3>
+                        <p>Access settings by clicking the gear icon in the top right corner.</p>
+                        <ul class="list-disc pl-5 space-y-2 mt-2">
+                            <li>
+                                <span class="font-semibold">OpenAI API Key:</span> 
+                                Required for AI sentiment analysis. Get a key from 
+                                <a href="https://platform.openai.com/api-keys" target="_blank" class="link">platform.openai.com</a>.
+                            </li>
+                            <li>
+                                <span class="font-semibold">AI Mode Timeout:</span> 
+                                Automatically turn off AI mode after a period of time to save API usage.
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <div class="modal-action">
+                    <button class="btn btn-primary btn-sm" @click="showHelp = false">Close Help</button>
                 </div>
             </div>
         </div>
@@ -98,6 +359,22 @@
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                             </svg>
                         </button>
+                                <!-- Sentiment mode toggle and indicator -->
+                                <div class="flex items-center gap-1">
+                                    <button @click="toggleSentimentMode()" class="btn btn-sm" :class="sentimentMode ? 'btn-warning' : 'btn-outline btn-warning'" title="Toggle sentiment mode">
+                                        <span x-text="sentimentMode ? 'AI Mode On' : 'AI Mode Off'"></span>
+                                    </button>
+                                    <div x-show="sentimentMode" class="badge badge-warning animate-pulse" title="Sentiment mode is active">
+                                <span x-show="aiTimeoutRemaining > 0" x-text="aiTimeoutRemaining + 's'"></span>
+                                <span x-show="shortcutKey && aiTimeoutRemaining === 0" x-text="'Press ' + shortcutKey + ' to toggle'"></span>
+                                    </div>
+                                </div>
+                        <!-- Script execution toggle and indicator -->
+                        <div class="flex items-center gap-1">
+                            <button @click="toggleScriptsEnabled()" class="btn btn-sm" :class="scriptsEnabled ? 'btn-success' : 'btn-outline btn-error'" title="Toggle script execution">
+                                <span x-text="scriptsEnabled ? 'Scripts On' : 'Scripts Off'"></span>
+                            </button>
+                        </div>
                         <label class="swap swap-flip">
                             <input type="checkbox" x-model="isActive" @change="toggleActiveState" />
                             <div class="swap-on badge badge-success gap-1">Listening</div>
@@ -125,12 +402,10 @@
 
                                     <td>
                                         <span x-show="command.understand_sentiment" class="badge badge-accent">
-                                            <template x-if="command.sentiment_prefix">
-                                                <span x-text="command.sentiment_prefix"></span>
-                                            </template>
-                                            <template x-if="!command.sentiment_prefix">
-                                                <span>Enabled</span>
-                                            </template>
+                                            <span>AI</span>
+                                        </span>
+                                        <span x-show="command.partial_match" class="badge badge-primary">
+                                            <span>Partial</span>
                                         </span>
                                     </td>
 
@@ -196,21 +471,13 @@
                             <label class="label">
                                 <span class="label-text">Keyboard Script</span>
                                 <span class="label-text-alt">
-                                    <div class="dropdown dropdown-hover dropdown-top dropdown-end">
-                                        <label tabindex="0" class="btn btn-xs">Help</label>
-                                        <div tabindex="0" class="dropdown-content z-[1] card card-compact p-2 shadow bg-base-200 text-base-content w-64">
-                                            <div class="card-body text-xs">
-                                                <p>Format:</p>
-                                                <ul class="list-disc pl-4">
-                                                    <li>Comments: <code>-- comment</code> or <code># comment</code></li>
-                                                    <li>Delays: <code>100ms</code> or <code>1s</code></li>
-                                                    <li>Typing: <code>type "text"</code></li>
-                                                    <li>Key combos: <code>ctrl+shift+a</code></li>
-                                                    <li>Single keys: <code>enter</code>, <code>escape</code></li>
-                                                </ul>
-                                            </div>
-                                        </div>
-                                    </div>
+                                    <button @click="showHelp = true" class="btn btn-sm btn-info">
+                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 mr-1">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-1.171 1.025-3.071 1.025-4.242 0-1.172-1.025-1.172-2.687 0-3.712" />
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-1.171 1.025-3.071 1.025-4.242 0-1.172-1.025-1.172-2.687 0-3.712" />
+                                        </svg>
+                                        Help Guide
+                                    </button>
                                 </span>
                             </label>
                             <textarea x-model="newCommand.script" placeholder="Enter keyboard commands..." class="textarea textarea-bordered h-24" required></textarea>
@@ -220,25 +487,40 @@
                         <div class="form-control">
                             <label class="label cursor-pointer justify-start gap-2">
                                 <input type="checkbox" class="checkbox checkbox-accent" x-model="newCommand.understand_sentiment" />
-                                <span class="label-text">Understand Sentiment</span>
+                                <span class="label-text">Use AI Sentiment Analysis</span>
                                 <span class="label-text-alt opacity-70">(Uses ChatGPT to match intent)</span>
                             </label>
                             
-                            <!-- Sentiment Prefix (only shown when checkbox is checked) -->
                             <div x-show="newCommand.understand_sentiment" class="mt-2">
-                                <label class="label">
-                                    <span class="label-text">Prefix</span>
-                                    <span class="label-text-alt">Voice commands will only match if they start with this prefix</span>
-                                </label>
-                                <input type="text" x-model="newCommand.sentiment_prefix" placeholder="e.g., 'alpha tango'" class="input input-bordered w-full" />
                                 <div class="text-xs mt-1 opacity-70">
-                                    When a phrase begins with this prefix, ChatGPT will determine if your command should execute
+                                    ChatGPT will analyze spoken phrases to determine if this command should execute
+                                </div>
+                                <div class="alert alert-info mt-2 text-xs">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-4 w-4" fill="none" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                    </svg>
+                                    <span>For AI mode, your phrases should be descriptions of what the command does, not exact matching text.</span>
                                 </div>
                                 <div x-show="!apiKeyStatus.isSet" class="alert alert-warning mt-2 text-xs">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-4 w-4" fill="none" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                                     </svg>
                                     <span>OpenAI API key not set. Click the settings icon to set up your API key.</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Partial Matching Option -->
+                        <div class="form-control">
+                            <label class="label cursor-pointer justify-start gap-2">
+                                <input type="checkbox" class="checkbox checkbox-primary" x-model="newCommand.partial_match" />
+                                <span class="label-text">Enable Partial Matching</span>
+                                <span class="label-text-alt opacity-70">(Trigger if speech contains any phrase)</span>
+                            </label>
+                            
+                            <div x-show="newCommand.partial_match" class="mt-2">
+                                <div class="text-xs mt-1 opacity-70">
+                                    This command will trigger if any of its phrases are found anywhere in the spoken text
                                 </div>
                             </div>
                         </div>

@@ -18,7 +18,7 @@ document.addEventListener('alpine:init', () => {
             currentPhrase: '',  // For the input field
             script: '',
             understand_sentiment: false,
-            sentiment_prefix: ''
+            partial_match: false
         },
         editingCommand: null,
         previewResult: {
@@ -29,6 +29,7 @@ document.addEventListener('alpine:init', () => {
         socket: null,
         // Settings
         showSettings: false,
+        showHelp: false,  // Flag for help modal visibility
         openaiApiKey: '',
         apiKeyStatus: {
             isSet: false,
@@ -40,6 +41,19 @@ document.addEventListener('alpine:init', () => {
         },
         // Triggered command tracking
         triggeredCommandId: null,
+        // Shortcut key settings
+        shortcutKey: '',
+        shortcutKeyInput: '',
+        listeningForShortcut: false,
+        sentimentMode: false,
+        // AI timeout settings
+        aiTimeout: {
+            enabled: false,
+            seconds: 60
+        },
+        aiTimeoutRemaining: 0,
+        // Script execution state
+        scriptsEnabled: true,
 
         /**
          * Initializes the application
@@ -58,6 +72,13 @@ document.addEventListener('alpine:init', () => {
             // Get OpenAI stats
             this.fetchOpenAIStats();
             
+            // Get shortcut key and sentiment mode status
+            this.fetchShortcutKey();
+            this.fetchSentimentMode();
+            
+            // Get AI timeout settings
+            this.fetchAiTimeoutSettings();
+            
             // Connect to WebSocket
             this.connectWebSocket();
             
@@ -65,6 +86,209 @@ document.addEventListener('alpine:init', () => {
             setInterval(() => {
                 this.fetchOpenAIStats();
             }, 30000); // Refresh every 30 seconds
+            
+            // Add global keyboard event listener for shortcut key
+            this.setupShortcutKeyListener();
+        },
+
+        /**
+         * Set up listener for the global shortcut key
+         */
+        setupShortcutKeyListener() {
+            document.addEventListener('keydown', (event) => {
+                // If we're in settings modal capturing a new shortcut
+                if (this.listeningForShortcut) {
+                    // Prevent default browser actions
+                    event.preventDefault();
+                    
+                    // Generate shortcut string (e.g., "ctrl+shift+p")
+                    const modifiers = [];
+                    if (event.ctrlKey) modifiers.push('ctrl');
+                    if (event.altKey) modifiers.push('alt');
+                    if (event.shiftKey) modifiers.push('shift');
+                    if (event.metaKey) modifiers.push('meta');
+                    
+                    // Get the key (excluding modifier keys)
+                    let key = event.key.toLowerCase();
+                    if (['control', 'alt', 'shift', 'meta'].includes(key)) {
+                        // Only modifier was pressed, wait for the actual key
+                        return;
+                    }
+                    
+                    // Create the shortcut string
+                    this.shortcutKeyInput = modifiers.length > 0 
+                        ? [...modifiers, key].join('+') 
+                        : key;
+                    
+                    // Stop listening for shortcut
+                    this.listeningForShortcut = false;
+                    return;
+                }
+                
+                // If not capturing, check if the pressed keys match the shortcut
+                if (this.shortcutKey) {
+                    const modifierMap = {
+                        'ctrl': event.ctrlKey,
+                        'alt': event.altKey,
+                        'shift': event.shiftKey,
+                        'meta': event.metaKey
+                    };
+                    
+                    const parts = this.shortcutKey.split('+');
+                    const keyPart = parts[parts.length - 1].toLowerCase();
+                    const modifierParts = parts.slice(0, -1).map(m => m.toLowerCase());
+                    
+                    // Check if all modifiers in the shortcut are pressed
+                    const modifiersMatch = modifierParts.every(mod => modifierMap[mod]);
+                    
+                    // Check if the key matches
+                    const keyMatches = event.key.toLowerCase() === keyPart;
+                    
+                    // If all parts match, toggle sentiment mode
+                    if (modifiersMatch && keyMatches) {
+                        console.log('Shortcut key pressed - toggling sentiment mode');
+                        this.toggleSentimentMode();
+                        event.preventDefault();
+                    }
+                }
+            });
+        },
+
+        /**
+         * Starts listening for a shortcut key combination
+         */
+        captureShortcutKey() {
+            this.listeningForShortcut = true;
+            this.shortcutKeyInput = 'Press a key combination...';
+        },
+
+        /**
+         * Saves the shortcut key to the database
+         */
+        async saveShortcutKey() {
+            if (!this.shortcutKeyInput || this.shortcutKeyInput === 'Press a key combination...') {
+                this.shortcutKeyInput = ''; // Clear input if it's the placeholder
+                return;
+            }
+
+            try {
+                console.log('Saving shortcut key:', this.shortcutKeyInput);
+                const response = await fetch('api/shortcut-key', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        shortcut_key: this.shortcutKeyInput
+                    })
+                });
+
+                if (response.ok) {
+                    // Update local shortcut key
+                    this.shortcutKey = this.shortcutKeyInput;
+                    
+                    // Show success message
+                    this.previewResult = {
+                        show: true,
+                        success: true,
+                        message: 'Shortcut key saved successfully'
+                    };
+                } else {
+                    console.error('Failed to save shortcut key');
+                    this.previewResult = {
+                        show: true,
+                        success: false,
+                        message: 'Failed to save shortcut key'
+                    };
+                }
+            } catch (error) {
+                console.error('Error saving shortcut key:', error);
+                this.previewResult = {
+                    show: true,
+                    success: false,
+                    message: 'Error saving shortcut key: ' + error.message
+                };
+            }
+        },
+
+        /**
+         * Fetches the shortcut key from the API
+         */
+        async fetchShortcutKey() {
+            try {
+                console.log('Fetching shortcut key...');
+                const response = await fetch('api/shortcut-key');
+                if (response.ok) {
+                    const data = await response.json();
+                    this.shortcutKey = data.shortcut_key;
+                    this.shortcutKeyInput = data.shortcut_key;
+                    console.log('Shortcut key loaded:', this.shortcutKey || 'None set');
+                } else {
+                    console.error('Failed to fetch shortcut key');
+                }
+            } catch (error) {
+                console.error('Error fetching shortcut key:', error);
+            }
+        },
+
+        /**
+         * Fetches the sentiment mode state from the API
+         */
+        async fetchSentimentMode() {
+            try {
+                console.log('Fetching sentiment mode state...');
+                const response = await fetch('api/sentiment-mode');
+                if (response.ok) {
+                    const data = await response.json();
+                    this.sentimentMode = data.active;
+                    console.log('Sentiment mode state:', this.sentimentMode ? 'Active' : 'Inactive');
+                } else {
+                    console.error('Failed to fetch sentiment mode state');
+                }
+            } catch (error) {
+                console.error('Error fetching sentiment mode state:', error);
+            }
+        },
+
+        /**
+         * Toggles the sentiment mode
+         */
+        async toggleSentimentMode() {
+            try {
+                console.log('Toggling sentiment mode...');
+                
+                // If we have a socket connection, use it for faster toggling
+                if (this.socket) {
+                    this.socket.emit('toggle_sentiment_mode');
+                    return; // The server will send back an update via WebSocket
+                }
+                
+                // Fallback to REST API
+                const response = await fetch('api/sentiment-mode', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    this.sentimentMode = data.active;
+                    
+                    // Show notification
+                    this.previewResult = {
+                        show: true,
+                        success: true,
+                        message: `Sentiment mode ${this.sentimentMode ? 'activated' : 'deactivated'}`
+                    };
+                    
+                    console.log('Sentiment mode toggled to:', this.sentimentMode);
+                } else {
+                    console.error('Failed to toggle sentiment mode');
+                }
+            } catch (error) {
+                console.error('Error toggling sentiment mode:', error);
+            }
         },
 
         /**
@@ -95,8 +319,8 @@ document.addEventListener('alpine:init', () => {
                 if (response.ok) {
                     const data = await response.json();
                     this.apiKeyStatus = {
-                        isSet: data.is_set,
-                        apiKey: data.api_key
+                        isSet: data.isSet,
+                        apiKey: data.apiKey
                     };
                     console.log('API key status:', this.apiKeyStatus.isSet ? 'Set' : 'Not set');
                 } else {
@@ -116,7 +340,7 @@ document.addEventListener('alpine:init', () => {
                 const response = await fetch('api/openai-stats');
                 if (response.ok) {
                     const data = await response.json();
-                    this.openaiStats.requestCount = data.request_count;
+                    this.openaiStats.requestCount = data.requestCount;
                     console.log('OpenAI request count:', this.openaiStats.requestCount);
                 } else {
                     console.error('Failed to fetch OpenAI stats');
@@ -143,7 +367,7 @@ document.addEventListener('alpine:init', () => {
                         'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({
-                        api_key: this.openaiApiKey
+                        apiKey: this.openaiApiKey
                     })
                 });
 
@@ -214,12 +438,6 @@ document.addEventListener('alpine:init', () => {
                 return;
             }
             
-            // Validate sentiment prefix if sentiment is enabled
-            if (this.newCommand.understand_sentiment && !this.newCommand.sentiment_prefix.trim()) {
-                alert("Please provide a prefix for sentiment-based matching");
-                return;
-            }
-            
             // Validate API key if sentiment analysis is enabled
             if (this.newCommand.understand_sentiment && !this.apiKeyStatus.isSet) {
                 if (confirm("Sentiment analysis requires an OpenAI API key. Would you like to set it up now?")) {
@@ -239,7 +457,7 @@ document.addEventListener('alpine:init', () => {
                         phrases: this.newCommand.phrases,
                         script: this.newCommand.script,
                         understand_sentiment: this.newCommand.understand_sentiment,
-                        sentiment_prefix: this.newCommand.sentiment_prefix
+                        partial_match: this.newCommand.partial_match
                     })
                 });
 
@@ -253,7 +471,7 @@ document.addEventListener('alpine:init', () => {
                     this.newCommand.currentPhrase = '';
                     this.newCommand.script = '';
                     this.newCommand.understand_sentiment = false;
-                    this.newCommand.sentiment_prefix = '';
+                    this.newCommand.partial_match = false;
                 } else {
                     console.error('Failed to add command');
                 }
@@ -277,7 +495,7 @@ document.addEventListener('alpine:init', () => {
             this.newCommand.currentPhrase = '';
             this.newCommand.script = command.script;
             this.newCommand.understand_sentiment = command.understand_sentiment || false;
-            this.newCommand.sentiment_prefix = command.sentiment_prefix || '';
+            this.newCommand.partial_match = command.partial_match || false;
         },
         
         /**
@@ -290,7 +508,7 @@ document.addEventListener('alpine:init', () => {
             this.newCommand.currentPhrase = '';
             this.newCommand.script = '';
             this.newCommand.understand_sentiment = false;
-            this.newCommand.sentiment_prefix = '';
+            this.newCommand.partial_match = false;
         },
         
         /**
@@ -306,12 +524,6 @@ document.addEventListener('alpine:init', () => {
             
             if (this.newCommand.phrases.length === 0) {
                 alert("Please add at least one voice phrase");
-                return;
-            }
-            
-            // Validate sentiment prefix if sentiment is enabled
-            if (this.newCommand.understand_sentiment && !this.newCommand.sentiment_prefix.trim()) {
-                alert("Please provide a prefix for sentiment-based matching");
                 return;
             }
             
@@ -334,7 +546,7 @@ document.addEventListener('alpine:init', () => {
                         phrases: this.newCommand.phrases,
                         script: this.newCommand.script,
                         understand_sentiment: this.newCommand.understand_sentiment,
-                        sentiment_prefix: this.newCommand.sentiment_prefix
+                        partial_match: this.newCommand.partial_match
                     })
                 });
 
@@ -348,19 +560,19 @@ document.addEventListener('alpine:init', () => {
                             phrase: this.newCommand.phrases[0], // For backward compatibility
                             script: this.newCommand.script,
                             understand_sentiment: this.newCommand.understand_sentiment,
-                            sentiment_prefix: this.newCommand.sentiment_prefix
+                            partial_match: this.newCommand.partial_match
                         };
                     }
                     
                     console.log('Command updated successfully');
                     
-                    // Reset form
+                    // Reset form after saving edit
                     this.editingCommand = null;
                     this.newCommand.phrases = [];
                     this.newCommand.currentPhrase = '';
                     this.newCommand.script = '';
                     this.newCommand.understand_sentiment = false;
-                    this.newCommand.sentiment_prefix = '';
+                    this.newCommand.partial_match = false;
                 } else {
                     console.error('Failed to update command');
                 }
@@ -394,7 +606,7 @@ document.addEventListener('alpine:init', () => {
                         this.newCommand.currentPhrase = '';
                         this.newCommand.script = '';
                         this.newCommand.understand_sentiment = false;
-                        this.newCommand.sentiment_prefix = '';
+                        this.newCommand.partial_match = false;
                     }
                 } else {
                     console.error('Failed to delete command');
@@ -438,7 +650,7 @@ document.addEventListener('alpine:init', () => {
         async fetchActiveState() {
             try {
                 console.log('Fetching active state...');
-                const response = await fetch('api/toggle');
+                const response = await fetch('api/active');
                 if (response.ok) {
                     const data = await response.json();
                     this.isActive = data.active;
@@ -455,7 +667,7 @@ document.addEventListener('alpine:init', () => {
         async toggleActiveState() {
             console.log('Toggling active state to:', this.isActive);
             try {
-                const response = await fetch('api/toggle', {
+                const response = await fetch('api/active', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -515,6 +727,41 @@ document.addEventListener('alpine:init', () => {
                     // Refresh OpenAI stats if a command was triggered
                     this.fetchOpenAIStats();
                 });
+                
+                // Listen for sentiment mode change events
+                this.socket.on('sentiment_mode', (data) => {
+                    console.log('Sentiment mode update:', data);
+                    this.sentimentMode = data.active;
+                    
+                    // Reset timeout remaining if sentiment mode is turned off
+                    if (!data.active) {
+                        this.aiTimeoutRemaining = 0;
+                    }
+                });
+
+                this.socket.on('scripts_execution', (data) => {
+                    console.log('Script execution update:', data);
+                    this.scriptsEnabled = data.active;
+                });
+                
+                // Listen for AI timeout events
+                this.socket.on('ai_timeout', (data) => {
+                    console.log('AI timeout update:', data);
+                    if (data.active) {
+                        this.aiTimeoutRemaining = data.remainingSeconds;
+                    } else {
+                        this.aiTimeoutRemaining = 0;
+                    }
+                });
+                
+                // Listen for AI timeout countdown updates
+                this.socket.on('ai_timeout_update', (data) => {
+                    if (data.active) {
+                        this.aiTimeoutRemaining = data.remainingSeconds;
+                    } else {
+                        this.aiTimeoutRemaining = 0;
+                    }
+                });
 
                 this.socket.on('disconnect', () => {
                     console.log('Disconnected from WebSocket server');
@@ -531,6 +778,101 @@ document.addEventListener('alpine:init', () => {
             if (this.recentSpeech) {
                 console.log('Using recent speech:', this.recentSpeech);
                 this.newCommand.currentPhrase = this.recentSpeech;
+            }
+        },
+
+        /**
+         * Fetches the AI mode timeout settings
+         */
+        async fetchAiTimeoutSettings() {
+            try {
+                console.log('Fetching AI timeout settings...');
+                const response = await fetch('api/ai-timeout');
+                if (response.ok) {
+                    const data = await response.json();
+                    this.aiTimeout.enabled = data.enabled;
+                    this.aiTimeout.seconds = data.seconds;
+                    console.log('AI timeout settings loaded:', this.aiTimeout);
+                } else {
+                    console.error('Failed to fetch AI timeout settings');
+                }
+            } catch (error) {
+                console.error('Error fetching AI timeout settings:', error);
+            }
+        },
+
+        /**
+         * Saves the AI mode timeout settings
+         */
+        async saveAiTimeout() {
+            try {
+                console.log('Saving AI timeout settings...');
+                const response = await fetch('api/ai-timeout', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        enabled: this.aiTimeout.enabled,
+                        seconds: parseInt(this.aiTimeout.seconds)
+                    })
+                });
+
+                if (response.ok) {
+                    // Show success message
+                    this.previewResult = {
+                        show: true,
+                        success: true,
+                        message: this.aiTimeout.enabled ? 
+                            `AI timeout set to ${this.aiTimeout.seconds} seconds` : 
+                            'AI timeout disabled'
+                    };
+                } else {
+                    console.error('Failed to save AI timeout settings');
+                }
+            } catch (error) {
+                console.error('Error saving AI timeout settings:', error);
+            }
+        },
+
+        /**
+         * Toggles the scripts execution state
+         */
+        async toggleScriptsEnabled() {
+            try {
+                console.log('Toggling scripts execution state...');
+                
+                // If we have a socket connection, use it for faster toggling
+                if (this.socket) {
+                    this.socket.emit('toggle_scripts_execution');
+                    return; // The server will send back an update via WebSocket
+                }
+                
+                // Fallback to REST API
+                const response = await fetch('api/scripts-execution', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    this.scriptsEnabled = data.active;
+                    
+                    // Show notification
+                    this.previewResult = {
+                        show: true,
+                        success: true,
+                        message: `Script execution ${this.scriptsEnabled ? 'enabled' : 'disabled'}`
+                    };
+                    
+                    console.log('Script execution toggled to:', this.scriptsEnabled);
+                } else {
+                    console.error('Failed to toggle script execution');
+                }
+            } catch (error) {
+                console.error('Error toggling script execution:', error);
             }
         }
     }));

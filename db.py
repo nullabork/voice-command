@@ -44,6 +44,22 @@ def init_db():
         # Drop the existing table
         cursor.execute("DROP TABLE commands")
     
+    # Check if we need to migrate to add partial match field
+    partial_match_migration = False
+    try:
+        cursor.execute("SELECT sql FROM sqlite_master WHERE name='commands'")
+        table_def = cursor.fetchone()[0]
+        partial_match_migration = "partial_match" not in table_def.lower()
+    except:
+        pass
+        
+    if partial_match_migration and not needs_migration and not sentiment_migration:
+        print("Migrating database to support partial matching...")
+        # Create a backup of the commands table
+        cursor.execute("CREATE TABLE IF NOT EXISTS commands_backup AS SELECT * FROM commands")
+        # Drop the existing table
+        cursor.execute("DROP TABLE commands")
+    
     # Create commands table with phrases as JSON array if not exists
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS commands (
@@ -51,7 +67,7 @@ def init_db():
         phrases TEXT NOT NULL,  -- JSON array of phrases
         script TEXT NOT NULL,
         understand_sentiment INTEGER DEFAULT 0,  -- Boolean 0/1 for sentiment analysis
-        sentiment_prefix TEXT DEFAULT ''  -- Prefix for sentiment-based commands
+        partial_match INTEGER DEFAULT 0  -- Boolean 0/1 for partial phrase matching
     )
     ''')
     
@@ -77,8 +93,8 @@ def init_db():
             cursor.execute("SELECT id, phrases, script FROM commands_backup")
             for row in cursor.fetchall():
                 cursor.execute(
-                    'INSERT INTO commands (id, phrases, script, understand_sentiment, sentiment_prefix) VALUES (?, ?, ?, ?, ?)',
-                    (row[0], row[1], row[2], 0, '')
+                    'INSERT INTO commands (id, phrases, script, understand_sentiment) VALUES (?, ?, ?, ?)',
+                    (row[0], row[1], row[2], 0)
                 )
         elif 'phrase' in columns:
             # Old schema backup
@@ -86,10 +102,91 @@ def init_db():
             for row in cursor.fetchall():
                 phrases = json.dumps([row[1]])  # Convert single phrase to JSON array
                 cursor.execute(
-                    'INSERT INTO commands (id, phrases, script, understand_sentiment, sentiment_prefix) VALUES (?, ?, ?, ?, ?)',
-                    (row[0], phrases, row[2], 0, '')
+                    'INSERT INTO commands (id, phrases, script, understand_sentiment) VALUES (?, ?, ?, ?)',
+                    (row[0], phrases, row[2], 0)
                 )
         print("Sentiment fields migration completed.")
+    
+    # Migrate data if needed for partial match field
+    if partial_match_migration and not needs_migration and not sentiment_migration:
+        # Check which columns exist in the backup table
+        cursor.execute("PRAGMA table_info(commands_backup)")
+        columns = [column[1] for column in cursor.fetchall()]
+        
+        if 'understand_sentiment' in columns:
+            # Schema has sentiment analysis
+            cursor.execute("SELECT id, phrases, script, understand_sentiment FROM commands_backup")
+            for row in cursor.fetchall():
+                cursor.execute(
+                    'INSERT INTO commands (id, phrases, script, understand_sentiment, partial_match) VALUES (?, ?, ?, ?, ?)',
+                    (row[0], row[1], row[2], row[3], 0)
+                )
+        elif 'phrases' in columns:
+            # New schema without sentiment field
+            cursor.execute("SELECT id, phrases, script FROM commands_backup")
+            for row in cursor.fetchall():
+                cursor.execute(
+                    'INSERT INTO commands (id, phrases, script, understand_sentiment, partial_match) VALUES (?, ?, ?, ?, ?)',
+                    (row[0], row[1], row[2], 0, 0)
+                )
+        elif 'phrase' in columns:
+            # Old schema
+            cursor.execute("SELECT id, phrase, script FROM commands_backup")
+            for row in cursor.fetchall():
+                phrases = json.dumps([row[1]])  # Convert single phrase to JSON array
+                cursor.execute(
+                    'INSERT INTO commands (id, phrases, script, understand_sentiment, partial_match) VALUES (?, ?, ?, ?, ?)',
+                    (row[0], phrases, row[2], 0, 0)
+                )
+        print("Partial match field migration completed.")
+    
+    # Migrate data from old table with sentiment_prefix to new schema without prefix
+    try:
+        cursor.execute("PRAGMA table_info(commands)")
+        columns = [column[1] for column in cursor.fetchall()]
+        
+        if 'sentiment_prefix' in columns:
+            print("Migrating from sentiment_prefix schema to prefix-free schema...")
+            # Create a backup of the commands table
+            cursor.execute("CREATE TABLE IF NOT EXISTS commands_backup AS SELECT * FROM commands")
+            
+            # Drop the existing table
+            cursor.execute("DROP TABLE commands")
+            
+            # Recreate the table without sentiment_prefix field
+            cursor.execute('''
+            CREATE TABLE IF NOT EXISTS commands (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                phrases TEXT NOT NULL,  -- JSON array of phrases
+                script TEXT NOT NULL,
+                understand_sentiment INTEGER DEFAULT 0,  -- Boolean 0/1 for sentiment analysis
+                partial_match INTEGER DEFAULT 0  -- Boolean 0/1 for partial phrase matching
+            )
+            ''')
+            
+            # Check which columns exist in the backup table
+            cursor.execute("PRAGMA table_info(commands_backup)")
+            backup_columns = [column[1] for column in cursor.fetchall()]
+            
+            if 'understand_sentiment' in backup_columns:
+                # Schema has sentiment analysis
+                cursor.execute("SELECT id, phrases, script, understand_sentiment FROM commands_backup")
+                for row in cursor.fetchall():
+                    cursor.execute(
+                        'INSERT INTO commands (id, phrases, script, understand_sentiment, partial_match) VALUES (?, ?, ?, ?, ?)',
+                        (row[0], row[1], row[2], row[3], 0)
+                    )
+            else:
+                # Schema without sentiment field
+                cursor.execute("SELECT id, phrases, script FROM commands_backup")
+                for row in cursor.fetchall():
+                    cursor.execute(
+                        'INSERT INTO commands (id, phrases, script, understand_sentiment, partial_match) VALUES (?, ?, ?, ?, ?)',
+                        (row[0], row[1], row[2], 0, 0)
+                    )
+            print("Migration from sentiment_prefix schema completed.")
+    except Exception as e:
+        print(f"Error during schema migration: {e}")
     
     # Create settings table if not exists
     cursor.execute('''
@@ -106,6 +203,12 @@ def init_db():
                   ('openai_api_key', ''))
     cursor.execute('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)', 
                   ('openai_request_count', '0'))
+    cursor.execute('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)', 
+                  ('global_shortcut_key', ''))
+    cursor.execute('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)', 
+                  ('ai_timeout_enabled', 'false'))
+    cursor.execute('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)', 
+                  ('ai_timeout_seconds', '60'))
     
     conn.commit()
     conn.close()
@@ -116,7 +219,7 @@ def get_commands():
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
     
-    cursor.execute('SELECT id, phrases, script, understand_sentiment, sentiment_prefix FROM commands')
+    cursor.execute('SELECT id, phrases, script, understand_sentiment, partial_match FROM commands')
     commands = []
     for row in cursor.fetchall():
         cmd = dict(row)
@@ -126,6 +229,8 @@ def get_commands():
         cmd['phrase'] = cmd['phrases'][0] if cmd['phrases'] else ""
         # Convert understand_sentiment to boolean
         cmd['understand_sentiment'] = bool(cmd['understand_sentiment'])
+        # Convert partial_match to boolean
+        cmd['partial_match'] = bool(cmd['partial_match'])
         commands.append(cmd)
     
     conn.close()
@@ -149,39 +254,14 @@ def get_command_mappings():
     conn.close()
     return command_map
 
-def get_sentiment_commands():
-    """Get commands that have sentiment analysis enabled."""
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    cursor = conn.cursor()
-    
-    cursor.execute('SELECT id, phrases, script, sentiment_prefix FROM commands WHERE understand_sentiment = 1')
-    sentiment_commands = {}
-    
-    for row in cursor.fetchall():
-        prefix = row['sentiment_prefix'].lower()
-        if prefix not in sentiment_commands:
-            sentiment_commands[prefix] = []
-            
-        # Add command to the list for this prefix
-        cmd = {
-            'id': row['id'],
-            'phrases': json.loads(row['phrases']),
-            'script': row['script']
-        }
-        sentiment_commands[prefix].append(cmd)
-    
-    conn.close()
-    return sentiment_commands
-
-def add_command(phrases, script, understand_sentiment=False, sentiment_prefix=''):
+def add_command(phrases, script, understand_sentiment=False, partial_match=False):
     """Add a new command to the database.
     
     Args:
         phrases: Single string or list of phrases
         script: Command script to execute
         understand_sentiment: Whether to use sentiment analysis
-        sentiment_prefix: Prefix for sentiment-based commands
+        partial_match: Whether to allow partial matching
     """
     # Ensure phrases is a list
     if isinstance(phrases, str):
@@ -191,8 +271,8 @@ def add_command(phrases, script, understand_sentiment=False, sentiment_prefix=''
     cursor = conn.cursor()
     
     cursor.execute(
-        'INSERT INTO commands (phrases, script, understand_sentiment, sentiment_prefix) VALUES (?, ?, ?, ?)',
-        (json.dumps(phrases), script, 1 if understand_sentiment else 0, sentiment_prefix)
+        'INSERT INTO commands (phrases, script, understand_sentiment, partial_match) VALUES (?, ?, ?, ?)',
+        (json.dumps(phrases), script, 1 if understand_sentiment else 0, 1 if partial_match else 0)
     )
     
     command_id = cursor.lastrowid
@@ -201,7 +281,7 @@ def add_command(phrases, script, understand_sentiment=False, sentiment_prefix=''
     
     return command_id
 
-def update_command(command_id, phrases, script, understand_sentiment=False, sentiment_prefix=''):
+def update_command(command_id, phrases, script, understand_sentiment=False, partial_match=False):
     """Update an existing command in the database.
     
     Args:
@@ -209,7 +289,7 @@ def update_command(command_id, phrases, script, understand_sentiment=False, sent
         phrases: Single string or list of phrases
         script: Command script to execute
         understand_sentiment: Whether to use sentiment analysis
-        sentiment_prefix: Prefix for sentiment-based commands
+        partial_match: Whether to allow partial matching
     """
     # Ensure phrases is a list
     if isinstance(phrases, str):
@@ -219,8 +299,8 @@ def update_command(command_id, phrases, script, understand_sentiment=False, sent
     cursor = conn.cursor()
     
     cursor.execute(
-        'UPDATE commands SET phrases = ?, script = ?, understand_sentiment = ?, sentiment_prefix = ? WHERE id = ?',
-        (json.dumps(phrases), script, 1 if understand_sentiment else 0, sentiment_prefix, command_id)
+        'UPDATE commands SET phrases = ?, script = ?, understand_sentiment = ?, partial_match = ? WHERE id = ?',
+        (json.dumps(phrases), script, 1 if understand_sentiment else 0, 1 if partial_match else 0, command_id)
     )
     
     rows_affected = cursor.rowcount
@@ -326,3 +406,73 @@ def increment_openai_request_count():
     conn.commit()
     conn.close()
     return new_count 
+
+def get_global_shortcut_key():
+    """Get the global shortcut key from the database."""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    
+    cursor.execute('SELECT value FROM settings WHERE key = ?', ('global_shortcut_key',))
+    result = cursor.fetchone()
+    shortcut_key = result[0] if result else ''
+    
+    conn.close()
+    return shortcut_key
+
+def set_global_shortcut_key(shortcut_key):
+    """Set the global shortcut key in the database."""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    
+    cursor.execute(
+        'INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)',
+        ('global_shortcut_key', shortcut_key)
+    )
+    
+    conn.commit()
+    conn.close()
+    return True
+
+# Add new functions for AI mode timeout settings
+def get_ai_timeout_settings():
+    """Get the AI mode timeout settings from the database."""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    
+    cursor.execute('SELECT value FROM settings WHERE key = ?', ('ai_timeout_enabled',))
+    enabled_result = cursor.fetchone()
+    enabled = enabled_result[0].lower() == 'true' if enabled_result else False
+    
+    cursor.execute('SELECT value FROM settings WHERE key = ?', ('ai_timeout_seconds',))
+    seconds_result = cursor.fetchone()
+    seconds = int(seconds_result[0]) if seconds_result else 60
+    
+    conn.close()
+    return {
+        'enabled': enabled,
+        'seconds': seconds
+    }
+
+def set_ai_timeout_settings(enabled, seconds):
+    """Set the AI mode timeout settings in the database.
+    
+    Args:
+        enabled: Boolean indicating if timeout is enabled
+        seconds: Integer number of seconds for timeout
+    """
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    
+    cursor.execute(
+        'INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)',
+        ('ai_timeout_enabled', str(enabled).lower())
+    )
+    
+    cursor.execute(
+        'INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)',
+        ('ai_timeout_seconds', str(seconds))
+    )
+    
+    conn.commit()
+    conn.close()
+    return True 

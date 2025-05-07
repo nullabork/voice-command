@@ -6,6 +6,9 @@ import time
 import traceback
 from pynput.keyboard import Key, Controller, KeyCode
 
+# Remove the circular import from here
+# Will import inside the functions that need it
+
 # Initialize keyboard controller
 keyboard = Controller()
 
@@ -125,8 +128,97 @@ def press_key_combination(keys):
             except:
                 pass
 
-def execute_script(script):
-    """Execute a keyboard script."""
+def handle_special_function(function_name, args=None, socketio=None):
+    """Handle special function calls in scripts."""
+    # Import here to avoid circular import
+    from speech_recognition_handler import toggle_sentiment_mode, get_sentiment_mode_state, toggle_scripts_execution, get_scripts_execution_state
+    
+    function_name = function_name.lower()
+    
+    if function_name == 'sentiment_on':
+        # Turn on sentiment mode if not already on
+        if not get_sentiment_mode_state():
+            print("Turning sentiment mode ON")
+            toggle_sentiment_mode()
+            
+            # Notify frontend if socketio is available
+            if socketio:
+                socketio.emit('sentiment_mode', {'active': True})
+                socketio.emit('script_result', {
+                    'success': True, 
+                    'message': 'Sentiment mode activated'
+                })
+            return True
+        else:
+            print("Sentiment mode is already ON")
+            return True
+    
+    elif function_name == 'sentiment_off':
+        # Turn off sentiment mode if not already off
+        if get_sentiment_mode_state():
+            print("Turning sentiment mode OFF")
+            toggle_sentiment_mode()
+            
+            # Notify frontend if socketio is available
+            if socketio:
+                socketio.emit('sentiment_mode', {'active': False})
+                socketio.emit('script_result', {
+                    'success': True, 
+                    'message': 'Sentiment mode deactivated'
+                })
+            return True
+        else:
+            print("Sentiment mode is already OFF")
+            return True
+    
+    elif function_name == 'scripts_on':
+        # Turn on script execution if not already on
+        if not get_scripts_execution_state():
+            print("Enabling script execution")
+            toggle_scripts_execution()
+            
+            # Notify frontend if socketio is available
+            if socketio:
+                socketio.emit('scripts_execution', {'active': True})
+                socketio.emit('script_result', {
+                    'success': True, 
+                    'message': 'Script execution enabled'
+                })
+            return True
+        else:
+            print("Script execution is already enabled")
+            return True
+    
+    elif function_name == 'scripts_off':
+        # Turn off script execution if not already off
+        if get_scripts_execution_state():
+            print("Disabling script execution")
+            toggle_scripts_execution()
+            
+            # Notify frontend if socketio is available
+            if socketio:
+                socketio.emit('scripts_execution', {'active': False})
+                socketio.emit('script_result', {
+                    'success': True, 
+                    'message': 'Script execution disabled'
+                })
+            return True
+        else:
+            print("Script execution is already disabled")
+            return True
+    
+    # Add more special functions here as needed
+    
+    return False  # Function not handled
+
+def execute_script(script, preview_mode=False, socketio=None):
+    """Execute a keyboard script.
+    
+    Args:
+        script: The script to execute
+        preview_mode: If True, only simulate execution for preview
+        socketio: The SocketIO instance for sending updates to the frontend
+    """
     print(f"Executing script: {script[:50]}...")
     
     if not script:
@@ -134,6 +226,7 @@ def execute_script(script):
         return
         
     lines = script.strip().split('\n')
+    result_messages = []
     
     for line in lines:
         line = strip_comments(line)
@@ -143,8 +236,28 @@ def execute_script(script):
             continue
         
         print(f"Processing command: {line}")
+        result_messages.append(f"Command: {line}")
         
         try:
+            # Handle function calls - like sentiment_on() or sentiment_off()
+            function_match = re.match(r'(\w+)\(\)', line)
+            if function_match:
+                function_name = function_match.group(1)
+                print(f"Found function call: {function_name}()")
+                
+                if handle_special_function(function_name, socketio=socketio):
+                    result_messages.append(f"Executed function: {function_name}()")
+                    continue
+                else:
+                    print(f"Unknown function: {function_name}()")
+                    result_messages.append(f"WARNING: Unknown function: {function_name}()")
+                    continue
+            
+            # Skip actual keyboard input if in preview mode
+            if preview_mode:
+                result_messages.append("Preview mode - not actually executing")
+                continue
+            
             # Handle delay lines
             if line.endswith('ms'):
                 delay_match = re.match(r'(\d+)ms', line)
@@ -186,5 +299,11 @@ def execute_script(script):
             press_and_release(key)
             
         except Exception as e:
-            print(f"ERROR executing line '{line}': {str(e)}")
-            traceback.print_exc() 
+            error_msg = f"ERROR executing line '{line}': {str(e)}"
+            print(error_msg)
+            traceback.print_exc()
+            result_messages.append(error_msg)
+    
+    # Return results for preview
+    if preview_mode:
+        return "\n".join(result_messages) 
