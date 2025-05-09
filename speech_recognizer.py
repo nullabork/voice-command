@@ -13,7 +13,7 @@ class SpeechRecognizer:
         dynamic_energy_threshold=True,
         dynamic_energy_adjustment_damping=0.15,
         dynamic_energy_ratio=1.5,
-        pause_threshold=1.0,
+        pause_threshold=0.2,
         phrase_threshold=0.2,
         non_speaking_duration=0.2,
         operation_timeout=None

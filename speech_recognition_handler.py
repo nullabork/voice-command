@@ -387,9 +387,9 @@ def speech_recognition_loop(socketio=None):
             dynamic_energy_threshold=False,
             dynamic_energy_adjustment_damping=0.15,
             dynamic_energy_ratio=1.5,
-            pause_threshold=0.3,
+            pause_threshold=0.1,
             phrase_threshold=0.2,
-            non_speaking_duration=0.2,
+            non_speaking_duration=0.1,
             operation_timeout=None
         )
     

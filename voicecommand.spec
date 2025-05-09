@@ -5,26 +5,14 @@ a = Analysis(
     ['app.py'],
     pathex=[],
     binaries=[],
-    datas=[
-        ('public', 'public'),  # Include the frontend files
-        ('voicecommand.db', '.'),  # Include the database file
-    ],
-    hiddenimports=[
-        'engineio.async_drivers.threading',
-        'speech_recognition',
-        'pynput.keyboard._win32',
-        'pynput.mouse._win32',
-        'flask_socketio',
-        'flask_cors',
-        'requests',
-        'json',
-        'sqlite3',
-    ],
+    datas=[],
+    hiddenimports=[],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
     excludes=[],
     noarchive=False,
+    optimize=0,
 )
 pyz = PYZ(a.pure)
 
@@ -47,4 +35,4 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-) 
+)
