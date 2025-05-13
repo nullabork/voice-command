@@ -1,7 +1,7 @@
 """
 API routes module for voice command application.
 """
-from flask import Blueprint, request, jsonify, send_from_directory, current_app
+from flask import Blueprint, request, jsonify, send_from_directory, current_app, render_template
 import db
 import os
 from speech_recognition_handler import start_speech_recognition, stop_speech_recognition, update_openai_api_key, toggle_sentiment_mode, get_sentiment_mode_state, execute_script, get_scripts_execution_state, toggle_scripts_execution
@@ -9,14 +9,20 @@ from speech_recognition_handler import start_speech_recognition, stop_speech_rec
 # Create the API blueprint
 api_bp = Blueprint('api', __name__)
 
-# Routes for serving static files
+# Routes for serving templates and static files
 @api_bp.route('/')
 def index():
-    return send_from_directory('public', 'index.html')
+    # Use new template system
+    return render_template('layout.html')
 
-@api_bp.route('/<path:path>')
+@api_bp.route('/public/<path:path>')
 def serve_public(path):
     return send_from_directory('public', path)
+
+# Also add a JS-specific route for better organization
+@api_bp.route('/js/<path:path>')
+def serve_js(path):
+    return send_from_directory('public/js', path)
 
 # API Routes
 @api_bp.route('/api/commands', methods=['GET'])
@@ -220,7 +226,7 @@ def update_ai_timeout():
         enabled = data.get('enabled', False)
         seconds = data.get('seconds', 60)
         
-        db.update_ai_timeout_setting(enabled, seconds)
+        db.set_ai_timeout_settings(enabled, seconds)
         
         # No need to call update_ai_timeout_state since the settings will be read from the DB when needed
         

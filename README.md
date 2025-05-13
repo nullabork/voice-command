@@ -27,9 +27,23 @@ A web application that listens to voice commands and executes corresponding keyb
 1. Clone this repository
 
 2. Install the required Python packages:
+   
+   **Easy Method (Recommended):**
+   ```
+   python install_dependencies.py
+   ```
+   This script will automatically handle PyAudio installation based on your platform and Python version.
+
+   **Manual Method:**
    ```
    pip install -r requirements.txt
    ```
+   
+   **If PyAudio installation fails:**
+   - Windows: `pip install pipwin && pipwin install pyaudio`
+   - macOS: `brew install portaudio && pip install pyaudio`
+   - Linux: `sudo apt-get install python3-pyaudio` or 
+            `sudo apt-get install portaudio19-dev && pip install pyaudio`
 
 3. Run the application:
    ```

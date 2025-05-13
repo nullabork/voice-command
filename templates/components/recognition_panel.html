@@ -1,0 +1,47 @@
+<!-- Recognition Panel Component -->
+<div x-data="recognitionPanel" class="bg-base-100 rounded-box p-4 shadow-md">
+    <h2 class="text-xl font-semibold mb-4">Speech Recognition</h2>
+    
+    <div class="border-2 border-base-300 rounded-md p-3 h-48 overflow-y-auto">
+        <!-- <div class="flex items-center mb-3">
+            <span class="flex h-3 w-3 relative">
+                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75" 
+                      x-show="isActive"></span>
+                <span class="relative inline-flex rounded-full h-3 w-3" 
+                      :class="isActive ? 'bg-primary' : 'bg-base-300'"></span>
+            </span>
+            <span class="ml-2 text-sm font-medium" x-text="isActive ? 'Listening...' : 'Not listening'"></span> 
+        </div> -->
+        
+        <div id="speech-output" class="text-base-content space-y-2">
+            <template x-for="(item, index) in speechChunks" :key="index">
+                <div class="text-sm">
+                    <span x-text="item"></span>
+                </div>
+            </template>
+            
+            <div x-show="speechChunks.length === 0" class="text-sm opacity-50">
+                No speech detected yet. Say something...
+            </div>
+        </div>
+    </div>
+    
+    <div class="mt-4">
+        <h3 class="font-semibold">System Messages</h3>
+        <div class="mt-2 space-y-2 max-h-32 overflow-y-auto">
+            <template x-for="(message, index) in systemMessages" :key="index">
+                <div :class="`alert alert-${message.type} py-2 text-sm`">
+                    <span x-text="message.message"></span>
+                </div>
+            </template>
+            
+            <div x-show="systemMessages.length === 0" class="text-sm opacity-50">
+                No system messages.
+            </div>
+        </div>
+    </div>
+    
+    <div class="mt-4 flex justify-end">
+        <button @click="clearSpeechChunks" class="btn btn-sm btn-ghost">Clear History</button>
+    </div>
+</div> 

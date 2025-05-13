@@ -1,0 +1,78 @@
+<!-- Settings Modal Component -->
+<div x-data="settingsPanel" x-show="showSettings" class="modal modal-open">
+    <div class="modal-box">
+        <h3 class="font-bold text-lg">Settings</h3>
+        
+        <div class="form-control w-full mt-4">
+            <label class="label">
+                <span class="label-text">OpenAI API Key</span>
+                <span class="label-text-alt">Required for sentiment analysis</span>
+            </label>
+            <div class="flex gap-2">
+                <input 
+                    type="password" 
+                    x-model="openaiApiKey" 
+                    placeholder="Enter your OpenAI API key" 
+                    class="input input-bordered w-full" 
+                />
+                <button @click="saveApiKey()" class="btn btn-primary">Save</button>
+            </div>
+            <label class="label overflow-x-auto">
+                <span class="label-text-alt" x-show="apiKeyStatus.isSet">
+                    <span class="text-success">✓ API key is set</span>
+                    <span  x-text="'(' + apiKeyStatus.apiKey + ')'"></span>
+                </span>
+                <span class="label-text-alt text-error" x-show="!apiKeyStatus.isSet">
+                    ✗ No API key set - sentiment analysis will not work
+                </span>
+            </label>
+            <div class="text-xs mt-2">
+                <p>You can get an OpenAI API key from <a href="https://platform.openai.com/api-keys" target="_blank" class="link">platform.openai.com/api-keys</a></p>
+                <p>The API key is stored securely in the database and used only for the sentiment analysis feature.</p>
+            </div>
+        </div>
+        
+        <!-- AI Mode Timeout Settings -->
+        <div class="form-control w-full mt-6">
+            <label class="label">
+                <span class="label-text">AI Mode Timeout</span>
+                <span class="label-text-alt">Automatically turn off AI mode</span>
+            </label>
+            <div class="flex gap-2 items-center">
+                <input 
+                    type="checkbox" 
+                    x-model="aiTimeout.enabled" 
+                    class="checkbox checkbox-warning"
+                />
+                <span class="label-text">Enable timeout</span>
+                <input 
+                    type="number" 
+                    x-model="aiTimeout.seconds" 
+                    min="1" 
+                    class="input input-bordered w-20 ml-4" 
+                    :disabled="!aiTimeout.enabled"
+                />
+                <span class="label-text">seconds</span>
+                <button @click="saveAiTimeout()" class="btn btn-primary ml-2">Save</button>
+            </div>
+            <div class="text-xs mt-2">
+                <p>When enabled, AI mode will automatically turn off after the specified timeout period.</p>
+                <p>This is useful to prevent leaving AI mode on unintentionally, which could use up your API quota.</p>
+            </div>
+        </div>
+        
+        <!-- OpenAI Stats Section -->
+        <div class="divider"></div>
+        <div class="stats bg-base-200 w-full">
+            <div class="stat">
+                <div class="stat-title">OpenAI API Requests</div>
+                <div class="stat-value" x-text="openaiStats.requestCount">0</div>
+                <div class="stat-desc">Total requests to OpenAI API</div>
+            </div>
+        </div>
+        
+        <div class="modal-action">
+            <button class="btn btn-sm" @click="showSettings = false">Close</button>
+        </div>
+    </div>
+</div> 

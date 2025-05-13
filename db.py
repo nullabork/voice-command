@@ -475,4 +475,14 @@ def set_ai_timeout_settings(enabled, seconds):
     
     conn.commit()
     conn.close()
-    return True 
+    return True
+
+# Add the missing function that's causing the error
+def update_ai_timeout_setting(enabled, seconds):
+    """Update the AI mode timeout settings in the database.
+    
+    Args:
+        enabled: Boolean indicating if timeout is enabled
+        seconds: Integer number of seconds for timeout
+    """
+    return set_ai_timeout_settings(enabled, seconds) 

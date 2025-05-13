@@ -4,7 +4,7 @@ Voice Command Application
 
 A web application that listens to voice commands and executes keyboard actions.
 """
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, render_template
 from flask_cors import CORS
 from flask_socketio import SocketIO
 import os
@@ -20,7 +20,9 @@ from speech_recognition_handler import start_speech_recognition, stop_speech_rec
 from input_simulation import execute_script
 
 # Initialize Flask application
-app = Flask(__name__, static_folder='public')
+app = Flask(__name__, 
+            static_folder='public',
+            template_folder='templates')
 CORS(app)
 socketio = SocketIO(app, cors_allowed_origins="*")
 
@@ -154,21 +156,6 @@ def handle_error(e):
         'error': str(e),
         'stack_trace': traceback.format_exc()
     }), 500
-
-# Route to serve the main application
-@app.route('/')
-def index():
-    return app.send_static_file('index.html')
-
-# Generic route to serve static files
-@app.route('/<path:path>')
-def static_files(path):
-    return app.send_static_file(path)
-
-# Catch-all route to redirect to the main application
-@app.route('/<path:path>', methods=['GET', 'POST', 'PUT', 'DELETE'])
-def catch_all(path):
-    return app.send_static_file('index.html')
 
 # Main entry point
 if __name__ == '__main__':

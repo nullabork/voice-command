@@ -1,0 +1,92 @@
+<!-- Add/Edit Command Form Component -->
+<div x-data="commandForm" class="bg-base-100 rounded-box p-4 shadow-md">
+    <h2 class="text-xl font-semibold mb-4" x-text="editingCommand ? 'Edit Command' : 'Add New Command'"></h2>
+    
+    <form @submit.prevent="editingCommand ? saveEdit() : addCommand()" class="flex flex-col gap-4">
+        <div class="form-control">
+            <label class="label">
+                <span class="label-text">Voice Phrases</span>
+                <span class="label-text-alt">Add multiple ways to trigger the same command</span>
+            </label>
+            
+            <!-- Current phrase list -->
+            <div class="flex flex-wrap gap-2 mb-2" x-show="newCommand.phrases.length > 0">
+                <template x-for="phrase in newCommand.phrases" :key="phrase">
+                    <div class="badge badge-primary gap-1">
+                        <span x-text="phrase"></span>
+                        <button type="button" @click="removePhrase(phrase)" class="btn btn-xs btn-circle btn-ghost">×</button>
+                    </div>
+                </template>
+            </div>
+            
+            <!-- New phrase input -->
+            <div class="input-group">
+                <input type="text" x-model="newCommand.currentPhrase" placeholder="What you'll say..." class="input input-bordered w-full" />
+                <button type="button" @click="addPhrase()" class="btn">Add</button>
+                <button type="button" @click="useRecentSpeech()" class="btn btn-square" title="Use recent speech">📋</button>
+            </div>
+        </div>
+        
+        <div class="form-control">
+            <label class="label">
+                <span class="label-text">Keyboard Script</span>
+                <span class="label-text-alt">
+                    <button @click="$dispatch('show-help')" class="btn btn-sm btn-info">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 mr-1">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-1.171 1.025-3.071 1.025-4.242 0-1.172-1.025-1.172-2.687 0-3.712" />
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-1.171 1.025-3.071 1.025-4.242 0-1.172-1.025-1.172-2.687 0-3.712" />
+                        </svg>
+                        Help Guide
+                    </button>
+                </span>
+            </label>
+            <textarea x-model="newCommand.script" placeholder="Enter keyboard commands..." class="textarea textarea-bordered h-24" required></textarea>
+        </div>
+        
+        <!-- Sentiment Analysis Options -->
+        <div class="form-control">
+            <label class="label cursor-pointer justify-start gap-2">
+                <input type="checkbox" class="checkbox checkbox-accent" x-model="newCommand.understand_sentiment" />
+                <span class="label-text">Use AI Sentiment Analysis</span>
+                <span class="label-text-alt opacity-70">(Uses ChatGPT to match intent)</span>
+            </label>
+            
+            <div x-show="newCommand.understand_sentiment" class="mt-2">
+                <div class="text-xs mt-1 opacity-70">
+                    ChatGPT will analyze spoken phrases to determine if this command should execute
+                </div>
+                <div class="alert alert-info mt-2 text-xs">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-4 w-4" fill="none" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    <span>When using AI mode, phrases should describe what the command does, not just exact keywords to match.</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Partial Matching Option -->
+        <div class="form-control">
+            <label class="label cursor-pointer justify-start gap-2">
+                <input type="checkbox" class="checkbox checkbox-primary" x-model="newCommand.partial_match" />
+                <span class="label-text">Enable Partial Matching</span>
+                <span class="label-text-alt opacity-70">(Match phrases anywhere in speech)</span>
+            </label>
+            
+            <div x-show="newCommand.partial_match" class="mt-2">
+                <div class="text-xs mt-1 opacity-70">
+                    Command will trigger when phrases appear anywhere in your speech, not just exact matches
+                </div>
+            </div>
+        </div>
+        
+        <div class="form-control mt-2">
+            <button type="submit" class="btn btn-primary">
+                <span x-text="editingCommand ? 'Save Changes' : 'Add Command'"></span>
+            </button>
+            
+            <button x-show="editingCommand" type="button" @click="cancelEdit()" class="btn btn-ghost mt-2">
+                Cancel Edit
+            </button>
+        </div>
+    </form>
+</div> 

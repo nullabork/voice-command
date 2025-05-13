@@ -403,59 +403,65 @@ def speech_recognition_loop(socketio=None):
     print("Voice command system active!")
     
     try:
-        while not stop_listening:
-            try:
-                # Check if we should still be listening
-                if not get_active_state():
-                    print("Active state is false, stopping speech recognition loop.")
-                    break
+        # Define callback for continuous recognition
+        def handle_speech_text(text):
+            nonlocal socketio
+            
+            if not text:
+                return
                 
-                # Listen for audio and recognize it
-                text = speech_recognizer.listen_and_recognize(timeout=5)
-                
-                if text:
-                    print(f"Recognized: {text}")
+            print(f"Recognized: {text}")
+            
+            # Send recognized text to connected clients if socketio is provided
+            if socketio:
+                socketio.emit('speech_chunk', {'text': text})
+            
+            # Process the speech input
+            command_id, matched_phrase, script = process_speech_input(text, socketio)
+            
+            # Execute the matched command if found
+            if matched_phrase and script:
+                # Check if we should execute this command (debounce)
+                if should_execute_command(matched_phrase):
+                    print(f"Executing command for phrase: '{matched_phrase}'")
+                    print(f"Script to execute: {script}")
                     
-                    # Send recognized text to connected clients if socketio is provided
-                    if socketio:
-                        socketio.emit('speech_chunk', {'text': text})
+                    # Notify clients that a command was triggered
+                    if socketio and command_id:
+                        socketio.emit('command_triggered', {
+                            'command_id': command_id,
+                            'phrase': matched_phrase
+                        })
                     
-                    # Process the speech input
-                    command_id, matched_phrase, script = process_speech_input(text, socketio)
-                    
-                    # Execute the matched command if found
-                    if matched_phrase and script:
-                        # Check if we should execute this command (debounce)
-                        if should_execute_command(matched_phrase):
-                            print(f"Executing command for phrase: '{matched_phrase}'")
-                            print(f"Script to execute: {script}")
-                            
-                            # Notify clients that a command was triggered
-                            if socketio and command_id:
-                                socketio.emit('command_triggered', {
-                                    'command_id': command_id,
-                                    'phrase': matched_phrase
-                                })
-                            
-                            # Check if this script can be executed based on scripts_enabled flag
-                            if can_execute_script(script):
-                                # Execute the script
-                                execute_script(script, socketio=socketio)
-                            else:
-                                print("Script execution is disabled. Skipping execution.")
-                                if socketio:
-                                    socketio.emit('system_message', {
-                                        'type': 'warning',
-                                        'message': 'Script execution is disabled. Use scripts_on() to re-enable.'
-                                    })
-                        else:
-                            print(f"Skipping execution of '{matched_phrase}' due to debounce rules")
+                    # Check if this script can be executed based on scripts_enabled flag
+                    if can_execute_script(script):
+                        # Execute the script
+                        execute_script(script, socketio=socketio)
                     else:
-                        print("No matching command found for the recognized speech.")
-                
-            except Exception as e:
-                print(f"Error in speech recognition loop: {e}")
-                time.sleep(1)  # Prevent tight loop on recurring errors
+                        print("Script execution is disabled. Skipping execution.")
+                        if socketio:
+                            socketio.emit('system_message', {
+                                'type': 'warning',
+                                'message': 'Script execution is disabled. Use scripts_on() to re-enable.'
+                            })
+                else:
+                    print(f"Skipping execution of '{matched_phrase}' due to debounce rules")
+        
+        # Start continuous recognition
+        speech_recognizer.start_continuous_recognition(handle_speech_text)
+        
+        # Wait until stop_listening is set to True
+        while not stop_listening:
+            # Check if we should still be listening
+            if not get_active_state():
+                print("Active state is false, stopping speech recognition loop.")
+                break
+            
+            time.sleep(1)  # Check every second
+            
+        # Stop continuous recognition
+        speech_recognizer.stop_continuous_recognition()
+        
     except Exception as e:
         print(f"Critical error in speech recognition thread: {e}")
         traceback.print_exc()
@@ -516,9 +522,14 @@ def health_checker_loop(socketio=None):
 
 def stop_speech_recognition():
     """Stop the speech recognition thread."""
-    global stop_listening
+    global stop_listening, speech_recognizer
     
     stop_listening = True
+    
+    # If speech_recognizer exists, stop continuous recognition
+    if speech_recognizer:
+        speech_recognizer.stop_continuous_recognition()
+    
     print("Speech recognition thread stopping.")
     return True
 

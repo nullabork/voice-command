@@ -4,6 +4,7 @@ Input simulation module for executing keyboard scripts.
 import re
 import time
 import traceback
+import threading
 from pynput.keyboard import Key, Controller, KeyCode
 
 # Remove the circular import from here
@@ -14,6 +15,9 @@ keyboard = Controller()
 
 # Debug flag - set to True for verbose logging
 DEBUG = True
+
+# Currently running script threads
+running_scripts = []
 
 def strip_comments(line):
     """Strip comments from a line of script."""
@@ -211,8 +215,8 @@ def handle_special_function(function_name, args=None, socketio=None):
     
     return False  # Function not handled
 
-def execute_script(script, preview_mode=False, socketio=None):
-    """Execute a keyboard script.
+def execute_script_in_thread(script, preview_mode=False, socketio=None):
+    """Execute a keyboard script in a separate thread.
     
     Args:
         script: The script to execute
@@ -304,6 +308,38 @@ def execute_script(script, preview_mode=False, socketio=None):
             traceback.print_exc()
             result_messages.append(error_msg)
     
+    # Remove this thread from running scripts
+    global running_scripts
+    for thread in running_scripts[:]:
+        if not thread.is_alive():
+            running_scripts.remove(thread)
+    
     # Return results for preview
     if preview_mode:
-        return "\n".join(result_messages) 
+        return "\n".join(result_messages)
+
+def execute_script(script, preview_mode=False, socketio=None):
+    """Start a script execution in a background thread, allowing speech recognition to continue.
+    
+    Args:
+        script: The script to execute
+        preview_mode: If True, only simulate execution for preview
+        socketio: The SocketIO instance for sending updates to the frontend
+    """
+    # If preview mode, execute synchronously and return result
+    if preview_mode:
+        return execute_script_in_thread(script, preview_mode=True, socketio=socketio)
+    
+    # Otherwise, start in a background thread
+    script_thread = threading.Thread(
+        target=execute_script_in_thread,
+        args=(script, preview_mode, socketio)
+    )
+    script_thread.daemon = True  # Allow the thread to be terminated when the main program exits
+    script_thread.start()
+    
+    # Keep track of running script threads
+    global running_scripts
+    running_scripts.append(script_thread)
+    
+    return "Script started in background" 

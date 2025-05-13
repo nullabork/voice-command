@@ -1,0 +1,53 @@
+<!-- Command List Component -->
+<div x-data="commandList">
+    <div class="overflow-x-auto">
+        <table class="table table-zebra w-full">
+            <thead>
+                <tr>
+                    <th>Prefix</th>
+                    <th>Voice Phrases</th>
+                    <th>Action</th>                                
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <template x-for="command in commands" :key="command.id">
+                    <tr :id="'command-' + command.id" 
+                        :class="{'triggered-command': triggeredCommandId === command.id}" 
+                        @animationend="triggeredCommandId = null">
+
+                        <td>
+                            <span x-show="command.understand_sentiment" class="badge badge-accent">
+                                <span>AI</span>
+                            </span>
+                            <span x-show="command.partial_match" class="badge badge-primary">
+                                <span>Partial</span>
+                            </span>
+                        </td>
+
+                        <td>
+                            <div class="flex flex-wrap gap-1">
+                                <template x-for="phrase in command.phrases" :key="phrase">
+                                    <span class="badge badge-primary" x-text="phrase"></span>
+                                </template>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="tooltip" :data-tip="command.script">
+                                <button @click="previewScript(command.script)" class="btn btn-sm btn-ghost">Preview</button>
+                            </div>
+                        </td>
+                        
+                        <td class="flex gap-2">
+                            <button @click="startEditing(command)" class="btn btn-sm btn-info">Edit</button>
+                            <button @click="deleteCommand(command.id)" class="btn btn-sm btn-error">Delete</button>
+                        </td>
+                    </tr>
+                </template>
+                <tr x-show="commands.length === 0">
+                    <td colspan="4" class="text-center py-4">No commands configured yet.</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div> 

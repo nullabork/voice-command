@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voice Command System</title>
+    
+    <!-- Tailwind CSS and DaisyUI -->
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@3.9.4/dist/full.css" rel="stylesheet" type="text/css" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Socket.IO -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
+    
+    <!-- Custom Styles -->
+    <style>
+        /* Animation for triggered commands */
+        @keyframes highlight {
+            0% { background-color: rgba(255, 193, 7, 0.2); }
+            50% { background-color: rgba(255, 193, 7, 0.5); }
+            100% { background-color: transparent; }
+        }
+        
+        .triggered-command {
+            animation: highlight 1.5s ease-in-out;
+        }
+        
+        [x-cloak] { display: none !important; }
+    </style>
+    
+    <!-- Alpine.js Components -->
+    <script src="/js/components/base.js"></script>
+    <script src="/js/components/commands.js"></script>
+    <script src="/js/components/settings.js"></script>
+    <script src="/js/components/recognition.js"></script>
+    <script src="/js/components/help.js"></script>
+
+    <!-- Alpine.js (Load AFTER custom JS) -->
+    <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.13.3/dist/cdn.min.js" defer></script>
+    
+    
+</head>
+<body class="bg-base-200 min-h-screen">
+    <div class="container mx-auto p-4" x-data="baseApp" x-cloak>
+        {% include 'components/header.html' %}
+        
+        <!-- Preview Result Toast -->
+        <div x-show="previewResult.show" 
+             class="toast toast-top toast-end z-50">
+            <div class="alert" :class="previewResult.success ? 'alert-success' : 'alert-error'">
+                <span x-text="previewResult.message"></span>
+                <button @click="closePreviewResult" class="btn btn-sm btn-ghost">×</button>
+            </div>
+        </div>
+        
+        <!-- Modals -->
+        {% include 'components/settings_modal.html' %}
+        {% include 'components/help_modal.html' %}
+        
+        <!-- Main Content -->
+        <main class="flex flex-col md:flex-row gap-8">
+            <!-- Left Column - Commands List -->
+            <div class="flex-1 bg-base-100 rounded-box p-4 shadow-md">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-semibold">Voice Commands</h2>
+                    <div class="flex gap-2">
+                        <button @click="showSettings = true" class="btn btn-sm btn-ghost" title="Settings">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 010 .255c-.007.378.138.75.43.99l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-.255c.007-.378-.138-.75-.43-.99l-1.004-.828a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.281z" />
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            </svg>
+                        </button>
+                        <!-- Sentiment mode toggle and indicator -->
+                        <div class="flex items-center gap-1">
+                            <button @click="toggleSentimentMode()" class="btn btn-sm" :class="sentimentMode ? 'btn-warning' : 'btn-outline btn-warning'" title="Toggle sentiment mode">
+                                <span x-text="sentimentMode ? 'AI Mode On' : 'AI Mode Off'"></span>
+                            </button>
+                            <div x-show="sentimentMode" class="badge badge-warning animate-pulse" title="Sentiment mode is active">
+                                <span x-show="aiTimeoutRemaining > 0" x-text="aiTimeoutRemaining + 's'"></span>
+                                <span x-show="shortcutKey && aiTimeoutRemaining === 0" x-text="'Press ' + shortcutKey + ' to toggle'"></span>
+                            </div>
+                        </div>
+                        <!-- Script execution toggle and indicator -->
+                        <div class="flex items-center gap-1">
+                            <button @click="toggleScriptsEnabled()" class="btn btn-sm" :class="scriptsEnabled ? 'btn-success' : 'btn-outline btn-error'" title="Toggle script execution">
+                                <span x-text="scriptsEnabled ? 'Scripts On' : 'Scripts Off'"></span>
+                            </button>
+                        </div>
+                        <label class="swap swap-flip">
+                            <input type="checkbox" x-model="isActive" @change="toggleActiveState" />
+                            <div class="swap-on badge badge-success gap-1">Listening</div>
+                            <div class="swap-off badge badge-error gap-1">Not Active</div>
+                        </label>
+                    </div>
+                </div>
+                
+                {% include 'components/command_list.html' %}
+            </div>
+            
+            <!-- Right Column - Add Command & Recognized Speech -->
+            <div class="flex-1 flex flex-col gap-6">
+                {% include 'components/command_form.html' %}
+                {% include 'components/recognition_panel.html' %}
+            </div>
+        </main>
+    </div>
+</body>
+</html> 
