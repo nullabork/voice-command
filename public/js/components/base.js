@@ -15,6 +15,7 @@ document.addEventListener('alpine:init', () => {
     scriptsEnabled: true,
     showSettings: false,
     showHelp: false,
+    showCommandForm: false,
     previewResult: {
       show: false,
       success: true,
@@ -35,6 +36,16 @@ document.addEventListener('alpine:init', () => {
       // Listen for preview result events from command list
       this.$el.addEventListener('preview-result', (event) => {
         this.showPreviewResult(event.detail.success, event.detail.message);
+      });
+      
+      // Listen for close command form events
+      this.$el.addEventListener('close-command-form', () => {
+        this.showCommandForm = false;
+      });
+      
+      // Listen for show command form events
+      this.$el.addEventListener('show-command-form', () => {
+        this.showCommandForm = true;
       });
       
       // Listen for custom events
@@ -88,7 +99,8 @@ document.addEventListener('alpine:init', () => {
     },
     
     toggleActiveState() {
-        console.log('Toggling active state:', this.isActive);
+        
+        this.isActive = !this.isActive;
       fetch('/api/active', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

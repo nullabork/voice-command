@@ -1,0 +1,133 @@
+<!-- Help Modal Component -->
+<div x-data="helpPanel" x-show="showHelp" class="modal modal-open z-50">
+    <div class="modal-box w-11/12 max-w-5xl max-h-[90vh] overflow-y-auto">
+        <div class="modal-action">
+            <button class="btn btn-primary btn-sm" @click="showHelp = false">Close Help</button>
+        </div>
+
+        <h2 class="text-2xl font-bold text-center mb-4">Voice Command System Help</h2>
+        
+        <div class="divider">Core Concepts</div>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- Voice Commands -->
+            <div class="card bg-base-200 shadow-md">
+                <div class="card-body">
+                    <h3 class="card-title">Voice Commands</h3>
+                    <p>The system listens for your voice and executes actions when it recognizes a command phrase.</p>
+                    <ul class="list-disc pl-5 space-y-1 mt-2">
+                        <li>Create commands with specific phrases to trigger them</li>
+                        <li>Each command executes a script of keyboard actions</li>
+                        <li>Commands appear in the list on the left side of the screen</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <!-- Matching Modes -->
+            <div class="card bg-base-200 shadow-md">
+                <div class="card-body">
+                    <h3 class="card-title">Matching Modes</h3>
+                    <p>Three ways to match your voice to commands:</p>
+                    <ol class="list-decimal pl-5 space-y-1 mt-2">
+                        <li>
+                            <span class="font-semibold">Exact Match:</span> 
+                            Your phrase must appear exactly in what you say (always active)
+                        </li>
+                        <li>
+                            <span class="font-semibold">Partial Match:</span> 
+                            Enable this per command to match if phrase appears anywhere in speech
+                        </li>
+                        <li>
+                            <span class="font-semibold">AI Mode:</span> 
+                            Uses OpenAI to understand command intent even with different phrasing
+                        </li>
+                    </ol>
+                    <div class="alert alert-info mt-3 text-sm">
+                        <div>
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="stroke-current shrink-0 w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                            <p><strong>When using AI Mode:</strong> Your phrases should be treated as descriptions of what the command does, rather than exact text to match. This helps the AI better understand the intent of your command.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="divider">System Controls</div>
+        
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <!-- Listening Toggle -->
+            <div class="card bg-base-200 shadow-md">
+                <div class="card-body">
+                    <h3 class="card-title">Listening Toggle</h3>
+                    <div class="badge badge-success mb-2">Listening</div>
+                    <div class="badge badge-error mb-4">Not Active</div>
+                    <p>Toggle whether the system is actively listening for commands.</p>
+                    <p class="text-sm mt-2">When disabled, the system completely stops listening for voice input.</p>
+                </div>
+            </div>
+            
+            <!-- AI Mode -->
+            <div class="card bg-base-200 shadow-md">
+                <div class="card-body">
+                    <h3 class="card-title">AI Mode</h3>
+                    <div class="badge badge-warning mb-2">AI Mode On</div>
+                    <div class="badge badge-warning mb-4 badge-outline">AI Mode Off</div>
+
+                    <p>Enables intelligent command matching using OpenAI.</p>
+                    <p class="text-sm mt-2">Toggle with the AI button.</p>
+                    <p class="text-sm mt-1">AI Mode can automatically turn off after a timeout period (configure in settings).</p>
+                </div>
+            </div>
+            
+            <!-- Script Execution -->
+            <div class="card bg-base-200 shadow-md">
+                <div class="card-body">
+                    <h3 class="card-title">Script Execution</h3>
+                    <div class="badge badge-success mb-2">Scripts On</div>
+                    <div class="badge badge-error mb-4">Scripts Off</div>
+                    <p>Controls whether recognized commands execute their scripts.</p>
+                    <p class="text-sm mt-2">Even when scripts are off, the system still listens and recognizes commands.</p>
+                    <p class="text-sm mt-1">Use <code>scripts_on()</code> and <code>scripts_off()</code> functions to control this.</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="divider">Keyboard Scripts</div>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- Script Syntax -->
+            <div class="card bg-base-200 shadow-md">
+                <div class="card-body">
+                    <h3 class="card-title">Script Syntax</h3>
+                    <p>Scripts are a sequence of commands executed when a voice command is recognized:</p>
+                    <ul class="pl-5 space-y-2 mt-2">
+                        <li><code class="bg-base-300 px-1 rounded">-- comment</code> or <code class="bg-base-300 px-1 rounded"># comment</code>: Add comments</li>
+                        <li><code class="bg-base-300 px-1 rounded">100ms</code> or <code class="bg-base-300 px-1 rounded">1s</code>: Add delays</li>
+                        <li><code class="bg-base-300 px-1 rounded">type "text"</code>: Type text</li>
+                        <li><code class="bg-base-300 px-1 rounded">ctrl+shift+a</code>: Press key combinations</li>
+                        <li><code class="bg-base-300 px-1 rounded">enter</code>, <code class="bg-base-300 px-1 rounded">escape</code>: Press single keys</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <!-- Special Functions -->
+            <div class="card bg-base-200 shadow-md">
+                <div class="card-body">
+                    <h3 class="card-title">Special Functions</h3>
+                    <p>Control system features from within scripts:</p>
+                    <ul class="pl-5 space-y-2 mt-2">
+                        <li><code class="bg-base-300 px-1 rounded">sentiment_on()</code>: Activate AI mode</li>
+                        <li><code class="bg-base-300 px-1 rounded">sentiment_off()</code>: Deactivate AI mode</li>
+                        <li><code class="bg-base-300 px-1 rounded">scripts_on()</code>: Enable script execution</li>
+                        <li><code class="bg-base-300 px-1 rounded">scripts_off()</code>: Disable script execution</li>
+                    </ul>
+                    <p class="text-sm mt-3">Note: Even when scripts are disabled, a script containing <code>scripts_on()</code> will still execute.</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="modal-action">
+            <button class="btn btn-primary btn-sm" @click="showHelp = false">Close Help</button>
+        </div>
+    </div>
+</div> 

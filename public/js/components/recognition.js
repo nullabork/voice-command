@@ -44,13 +44,18 @@ document.addEventListener('alpine:init', () => {
     },
     
     addSpeechChunk(text) {
-    //   this.speechChunks.push(text); insert into the first position
+      // Add to the beginning of the array
       this.speechChunks.unshift(text);
       
       // Keep the maximum number of chunks
       if (this.speechChunks.length > this.maxSpeechChunks) {
         this.speechChunks = this.speechChunks.slice(0, this.maxSpeechChunks);
       }
+      
+      // Dispatch event for speech capture in command form
+      document.dispatchEvent(new CustomEvent('speech-chunk', {
+        detail: { text }
+      }));
       
       // Scroll to bottom
       this.$nextTick(() => {
