@@ -3,11 +3,9 @@ Database module for voice command application.
 """
 import sqlite3
 import json
-import os
-from src.utils import resolve_path
 
 # Database setup
-DB_PATH = resolve_path('voicecommand.db')
+DB_PATH = 'voicecommand.db'
 
 def init_db():
     """Initialize the SQLite database with required tables if they don't exist."""

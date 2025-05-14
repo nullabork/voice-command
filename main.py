@@ -5,6 +5,14 @@ Voice Command Application - Main Entry Point
 This file provides backward compatibility for the restructured codebase.
 It imports from the new folder structure but maintains the same functionality.
 """
+import os
+import sys
+
+# Print environment info for debugging
+print(f"Python version: {sys.version}")
+print(f"Working directory: {os.getcwd()}")
+print(f"Available files: {os.listdir('.')}")
+
 # Import from new structure
 from src.core.app import app, socketio, initialize_app
 
@@ -14,4 +22,5 @@ if __name__ == '__main__':
     initialize_app()
     
     # Start the Flask application with SocketIO
-    socketio.run(app, host='0.0.0.0', port=5000, debug=False) 
+    print("Starting Flask application with SocketIO...")
+    socketio.run(app, host='0.0.0.0', port=5000, debug=True) 

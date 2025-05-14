@@ -2,31 +2,12 @@
 API routes module for voice command application.
 """
 from flask import Blueprint, request, jsonify, send_from_directory, current_app, render_template
-from src.db.db import (
-    get_commands as db_get_commands, 
-    add_command as db_add_command, 
-    update_command as db_update_command, 
-    delete_command as db_delete_command, 
-    get_active_state, set_active_state, get_openai_api_key, set_openai_api_key,
-    get_openai_request_count, get_global_shortcut_key, set_global_shortcut_key,
-    get_ai_timeout_settings, set_ai_timeout_settings
-)
+import db
 import os
-from src.speech.recognition_handler import (
-    start_speech_recognition, stop_speech_recognition, update_openai_api_key, 
-    toggle_sentiment_mode, get_sentiment_mode_state, get_scripts_execution_state, 
-    toggle_scripts_execution
-)
-from src.input.simulation import execute_script
-from src.utils import get_project_root, resolve_path
+from speech_recognition_handler import start_speech_recognition, stop_speech_recognition, update_openai_api_key, toggle_sentiment_mode, get_sentiment_mode_state, execute_script, get_scripts_execution_state, toggle_scripts_execution
 
 # Create the API blueprint
 api_bp = Blueprint('api', __name__)
-
-# Get absolute paths for static files
-root_dir = get_project_root()
-public_dir = os.path.join(root_dir, 'public')
-js_dir = os.path.join(public_dir, 'js')
 
 # Routes for serving templates and static files
 @api_bp.route('/')
@@ -36,17 +17,17 @@ def index():
 
 @api_bp.route('/public/<path:path>')
 def serve_public(path):
-    return send_from_directory(public_dir, path)
+    return send_from_directory('public', path)
 
 # Also add a JS-specific route for better organization
 @api_bp.route('/js/<path:path>')
 def serve_js(path):
-    return send_from_directory(js_dir, path)
+    return send_from_directory('public/js', path)
 
 # API Routes
 @api_bp.route('/api/commands', methods=['GET'])
 def get_commands():
-    commands = db_get_commands()
+    commands = db.get_commands()
     return jsonify(commands)
 
 @api_bp.route('/api/commands', methods=['POST'])
@@ -70,7 +51,7 @@ def add_command():
     # Get partial match field
     partial_match = data.get('partial_match', False)
     
-    command_id = db_add_command(
+    command_id = db.add_command(
         phrases, 
         data['script'], 
         understand_sentiment=understand_sentiment,
@@ -107,7 +88,7 @@ def update_command(command_id):
     # Get partial match field
     partial_match = data.get('partial_match', False)
     
-    success = db_update_command(
+    success = db.update_command(
         command_id, 
         phrases, 
         data['script'],
@@ -129,7 +110,7 @@ def update_command(command_id):
 
 @api_bp.route('/api/commands/<int:command_id>', methods=['DELETE'])
 def delete_command(command_id):
-    success = db_delete_command(command_id)
+    success = db.delete_command(command_id)
     
     if not success:
         return jsonify({'error': 'Command not found'}), 404
@@ -138,7 +119,7 @@ def delete_command(command_id):
 
 @api_bp.route('/api/active', methods=['GET'])
 def get_active():
-    active = get_active_state()
+    active = db.get_active_state()
     return jsonify({'active': active})
 
 @api_bp.route('/api/active', methods=['POST'])
@@ -148,7 +129,7 @@ def set_active():
         return jsonify({'error': 'Missing active state'}), 400
     
     active = data['active']
-    set_active_state(active)
+    db.set_active_state(active)
     
     if active:
         # Start speech recognition with socketio instance
@@ -162,7 +143,7 @@ def set_active():
 
 @api_bp.route('/api/openai-key', methods=['GET'])
 def get_openai_key_status():
-    api_key = get_openai_api_key()
+    api_key = db.get_openai_api_key()
     is_set = bool(api_key)
     
     # Mask the API key for security
@@ -184,7 +165,7 @@ def set_openai_key():
         return jsonify({'error': 'Missing API key'}), 400
     
     api_key = data['apiKey']
-    set_openai_api_key(api_key)
+    db.set_openai_api_key(api_key)
     
     # Update the API key in the speech recognition handler
     update_openai_api_key(api_key)
@@ -193,14 +174,14 @@ def set_openai_key():
 
 @api_bp.route('/api/openai-stats', methods=['GET'])
 def get_openai_stats():
-    request_count = get_openai_request_count()
+    request_count = db.get_openai_request_count()
     return jsonify({
         'requestCount': request_count
     })
 
 @api_bp.route('/api/shortcut-key', methods=['GET'])
 def get_shortcut_key():
-    shortcut_key = get_global_shortcut_key()
+    shortcut_key = db.get_global_shortcut_key()
     return jsonify({
         'shortcutKey': shortcut_key
     })
@@ -212,7 +193,7 @@ def set_shortcut_key():
         return jsonify({'error': 'Missing shortcut key'}), 400
     
     shortcut_key = data['shortcutKey']
-    set_global_shortcut_key(shortcut_key)
+    db.set_global_shortcut_key(shortcut_key)
     
     return jsonify({'success': True})
 
@@ -235,7 +216,7 @@ def set_sentiment_mode():
 @api_bp.route('/api/ai-timeout', methods=['GET'])
 def get_ai_timeout():
     """Get AI mode timeout settings."""
-    timeout_settings = get_ai_timeout_settings()
+    timeout_settings = db.get_ai_timeout_settings()
     return jsonify(timeout_settings)
 
 @api_bp.route('/api/ai-timeout', methods=['POST'])
@@ -245,7 +226,7 @@ def update_ai_timeout():
         enabled = data.get('enabled', False)
         seconds = data.get('seconds', 60)
         
-        set_ai_timeout_settings(enabled, seconds)
+        db.set_ai_timeout_settings(enabled, seconds)
         
         # No need to call update_ai_timeout_state since the settings will be read from the DB when needed
         

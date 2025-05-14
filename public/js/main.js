@@ -665,7 +665,7 @@ document.addEventListener('alpine:init', () => {
          * Toggles the active state
          */
         async toggleActiveState() {
-            console.log('Toggling active state to:', this.isActive);
+            // console.log('Toggling active state to:', this.isActive);
             try {
                 const response = await fetch('api/active', {
                     method: 'POST',

@@ -13,26 +13,16 @@ import traceback
 import threading
 import time
 
-# Import app modules using the new structure
-from src.db.db import init_db, get_openai_api_key, get_active_state
-from src.api.api import api_bp
-from src.speech.recognition_handler import start_speech_recognition, stop_speech_recognition, update_openai_api_key, toggle_sentiment_mode, get_sentiment_mode_state, get_ai_timeout_state, toggle_scripts_execution, get_scripts_execution_state
-from src.input.simulation import execute_script
-from src.utils import get_project_root, resolve_path
-
-# Get absolute paths for templates and static files
-root_dir = get_project_root()
-templates_dir = os.path.join(root_dir, 'templates')
-static_dir = os.path.join(root_dir, 'public')
-
-print(f"Root directory: {root_dir}")
-print(f"Templates directory: {templates_dir}")
-print(f"Static directory: {static_dir}")
+# Import app modules
+import db
+from api import api_bp
+from speech_recognition_handler import start_speech_recognition, stop_speech_recognition, update_openai_api_key, toggle_sentiment_mode, get_sentiment_mode_state, get_ai_timeout_state, toggle_scripts_execution, get_scripts_execution_state
+from input_simulation import execute_script
 
 # Initialize Flask application
 app = Flask(__name__, 
-            static_folder=static_dir,
-            template_folder=templates_dir)
+            static_folder='public',
+            template_folder='templates')
 CORS(app)
 socketio = SocketIO(app, cors_allowed_origins="*")
 
@@ -56,10 +46,10 @@ def before_request():
 def initialize_app():
     """Initialize the application."""
     # Initialize database
-    init_db()
+    db.init_db()
     
     # Update OpenAI API key from database
-    api_key = get_openai_api_key()
+    api_key = db.get_openai_api_key()
     if api_key:
         update_openai_api_key(api_key)
     
@@ -69,7 +59,7 @@ def initialize_app():
     print("Application initialized.")
 
     global speech_recognition_initialized
-    if get_active_state() and not speech_recognition_initialized:
+    if db.get_active_state() and not speech_recognition_initialized:
         print("Starting speech recognition on socket connection...")
         speech_recognition_initialized = True
         start_speech_recognition(socketio)
